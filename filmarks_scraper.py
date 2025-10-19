@@ -8,7 +8,8 @@ from jinja2 import Template
 from urllib.parse import urljoin 
 
 # --- 設定 ---
-TOTAL_PAGES = 30 # 確定まで1ページに設定
+# ページ数を再設定してください（例: 30ページ）
+TOTAL_PAGES = 1 
 BASE_DOMAIN = "https://filmarks.com" 
 # --- /設定 ---
 
@@ -85,7 +86,7 @@ for page in range(1, TOTAL_PAGES + 1):
                     movie_id = data_clip.get('movie_id')
                     
                     if movie_id:
-                        # ★★★ 変更点: vodパラメーターを削除 ★★★
+                        # vodパラメーターを削除
                         detail_url = f"{BASE_DOMAIN}/movies/{movie_id}" 
                 except json.JSONDecodeError:
                     pass
@@ -157,27 +158,98 @@ else:
 <head>
     <meta charset="UTF-8">
     <title>Filmarks VODランキング (最終版)</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <style>
-        /* スタイルは変更なし */
+        /* デスクトップ/共通スタイル */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
         h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 30px; text-align: center; }
-        .movie-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px dashed #eee; transition: background-color 0.3s; }
+        
+        /* movie-item: デスクトップでは横並び */
+        .movie-item { 
+            display: flex; 
+            align-items: center; 
+            padding: 15px; 
+            border-bottom: 1px dashed #eee; 
+            transition: background-color 0.3s; 
+        }
         .movie-item:hover { background-color: #fcfcfc; }
+        
         .rank { font-size: 2.5em; font-weight: bold; width: 80px; text-align: center; color: #aaa; flex-shrink: 0; margin-right: 10px; }
         .rank.top3 { color: #ffbf00; } 
         .rank.top10 { color: #0088cc; } 
+        
         .poster { width: 70px; height: 100px; margin-right: 20px; flex-shrink: 0; }
         .poster img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
+        
         .info { flex-grow: 1; }
         .title a { font-size: 1.2em; font-weight: 600; color: #333; text-decoration: none; }
         .title a:hover { color: #0088cc; text-decoration: underline; }
+        
         .release-date, .genre-info { font-size: 0.85em; color: #777; margin-bottom: 5px; line-height: 1.4; }
+        
         .score { font-size: 1.1em; font-weight: bold; color: #666; }
         .score-bar { height: 10px; background-color: #e0e0e0; border-radius: 5px; margin-top: 5px; width: 100%; max-width: 200px; }
         .score-fill { height: 100%; border-radius: 5px; background-color: #ffaa00; transition: width 0.5s; }
         .rating-highlight { background-color: #fff9e6; border-left: 5px solid #ffcc33; padding-left: 10px; }
         .rating-highlight .score { color: #ffaa00; font-weight: bold; }
+
+        /* ★★★ レスポンシブ対応 (画面幅600px以下で適用) ★★★ */
+        @media (max-width: 600px) {
+            body { padding: 5px; }
+            .container { padding: 10px; }
+            h1 { font-size: 1.4em; margin-bottom: 15px; }
+            
+            /* スマホで縦並びにする（ランクとコンテンツを分けて表示） */
+            .movie-item { 
+                flex-direction: column; /* ★★★ 縦並びにする ★★★ */
+                align-items: flex-start; /* 左寄せ */
+                padding: 10px 5px;
+            }
+            
+            /* 順位の表示をコンテンツの上部に移動 */
+            .rank { 
+                font-size: 1.8em; 
+                width: auto; 
+                margin: 0 0 10px 0; /* 下に余白 */
+                align-self: flex-start; /* 親要素の幅に関わらず左寄せ */
+            }
+            
+            /* ポスターと情報ブロックを横に並べるラッパー */
+            .content-wrap {
+                display: flex;
+                width: 100%; /* 全幅使用 */
+                align-items: flex-start;
+            }
+
+            .poster { 
+                width: 60px; /* ポスターを小さく */
+                height: 85px; 
+                margin-right: 10px; 
+            }
+            
+            .info { 
+                min-width: 0; 
+            }
+            
+            .title a { font-size: 1.0em; }
+            
+            .release-date, .genre-info { 
+                font-size: 0.75em; 
+                margin-bottom: 2px; 
+                line-height: 1.2;
+            }
+            
+            .score {
+                 font-size: 0.9em;
+            }
+            
+            .score-bar { 
+                max-width: 100%; /* 幅をコンテンツに合わせる */
+            }
+        }
     </style>
 </head>
 <body>
@@ -190,27 +262,31 @@ else:
         {% set rank_class = 'top3' if rank <= 3 else ('top10' if rank <= 10 else '') %}
         
         <div class="movie-item {% if is_highlight %}rating-highlight{% endif %}">
+            
             <div class="rank {{ rank_class }}">#{{ rank }}</div>
-            <div class="poster">
-                {% if row['画像URL'] %}
-                <img src="{{ row['画像URL'] }}" alt="{{ row['タイトル'] }} ポスター">
-                {% else %}
-                <div style="width: 100%; height: 100%; background: #ccc; display: flex; align-items: center; justify-content: center; font-size: 0.8em; text-align: center;">No Image</div>
-                {% endif %}
-            </div>
-            <div class="info">
-                <div class="title">
-                    {% if row['詳細URL'] != '#' %}
-                    <a href="{{ row['詳細URL'] }}" target="_blank">{{ row['タイトル'] }}</a>
+            
+            <div class="content-wrap">
+                <div class="poster">
+                    {% if row['画像URL'] %}
+                    <img src="{{ row['画像URL'] }}" alt="{{ row['タイトル'] }} ポスター">
                     {% else %}
-                    {{ row['タイトル'] }}
+                    <div style="width: 100%; height: 100%; background: #ccc; display: flex; align-items: center; justify-content: center; font-size: 0.8em; text-align: center;">No Image</div>
                     {% endif %}
                 </div>
-                <div class="genre-info">{{ row['ジャンル'] }}</div>
-                <div class="release-date">{{ row['上映日'] }}</div>
-                <div class="score">★{{ score | round(1) }} / 5.0</div>
-                <div class="score-bar">
-                    <div class="score-fill" style="width: {{ (score / 5.0 * 100) | round(0) }}%;"></div>
+                <div class="info">
+                    <div class="title">
+                        {% if row['詳細URL'] != '#' %}
+                        <a href="{{ row['詳細URL'] }}" target="_blank">{{ row['タイトル'] }}</a>
+                        {% else %}
+                        {{ row['タイトル'] }}
+                        {% endif %}
+                    </div>
+                    <div class="genre-info">{{ row['ジャンル'] }}</div>
+                    <div class="release-date">{{ row['上映日'] }}</div>
+                    <div class="score">★{{ score | round(1) }} / 5.0</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: {{ (score / 5.0 * 100) | round(0) }}%;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -224,7 +300,7 @@ else:
     html_output = html_template.render(data=ranking_df)
 
     # HTMLファイルを保存
-    html_file_path = 'filmarks_ranking_styled.html'
+    html_file_path = 'index.html' 
     try:
         with open(html_file_path, 'w', encoding='utf-8') as f:
             f.write(html_output)
