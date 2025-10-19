@@ -6,6 +6,10 @@ on:
     - cron: '0 6 * * *'
   # 手動実行を可能にする
   workflow_dispatch:
+  
+permissions:
+  contents: write 
+  pages: write # Pagesのデプロイを確実にするため追加
 
 jobs:
   scrape_and_deploy:
