@@ -8,7 +8,7 @@ from jinja2 import Template
 from urllib.parse import urljoin 
 
 # --- 設定 ---
-TOTAL_PAGES = 10 # 確定まで1ページに設定
+TOTAL_PAGES = 30 # 確定まで1ページに設定
 BASE_DOMAIN = "https://filmarks.com" 
 # --- /設定 ---
 
