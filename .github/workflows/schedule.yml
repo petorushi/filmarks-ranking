@@ -1,0 +1,37 @@
+name: Scheduled Scraper Update
+
+on:
+  # 毎日午前6時 (UTC) にジョブを実行する (日本時間では午前3時になります。日本時間午前6時なら '21 0 * * *' に変更してください)
+  schedule:
+    - cron: '0 6 * * *'
+  # 手動実行を可能にする
+  workflow_dispatch:
+
+jobs:
+  scrape_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x' 
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Scraper
+        # スクリプトを実行し、HTMLファイルを生成
+        run: python filmarks_scraper.py
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          # 生成されたHTMLファイルのみをコミット対象とする
+          files: filmarks_ranking_styled.html
+          commit_message: 'Auto update: Daily ranking data'
+          # GitHub Pagesのビルドをトリガーするためにトークンを使用
+          token: ${{ secrets.GITHUB_TOKEN }}
