@@ -13,7 +13,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 # --- 設定 ---
 # ページ数を1に設定
-TOTAL_PAGES = 1 
+TOTAL_PAGES = 5 
 BASE_DOMAIN = "https://filmarks.com" 
 
 # スクレピング対象のVODランキングURLリスト
