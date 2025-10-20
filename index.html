@@ -3,7 +3,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Filmarks VODランキング (最終版)</title>
+    <title>Filmarks VODランキング (Prime Video & Netflix)</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -13,75 +13,190 @@
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
         h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 30px; text-align: center; }
         
-        /* movie-item: デスクトップでは横並び */
-        .movie-item { 
+        .movie-item-link { 
             display: flex; 
-            align-items: center; 
+            align-items: stretch; /* デスクトップ: 子要素を縦方向に引き伸ばす */
             padding: 15px; 
             border-bottom: 1px dashed #eee; 
             transition: background-color 0.3s; 
+            text-decoration: none; 
+            color: inherit; 
         }
-        .movie-item:hover { background-color: #fcfcfc; }
+        .movie-item-link:hover { 
+            background-color: #fcfcfc; 
+        }
+
+        .movie-item {
+             border-left: 5px solid transparent; 
+        }
         
-        .rank { font-size: 2.5em; font-weight: bold; width: 80px; text-align: center; color: #aaa; flex-shrink: 0; margin-right: 10px; }
+        .rank { 
+            font-size: 2.5em; 
+            font-weight: bold; 
+            width: 80px; 
+            text-align: center; 
+            color: #aaa; 
+            flex-shrink: 0; 
+            margin-right: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+        }
         .rank.top3 { color: #ffbf00; } 
         .rank.top10 { color: #0088cc; } 
         
-        .poster { width: 70px; height: 100px; margin-right: 20px; flex-shrink: 0; }
-        .poster img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
+        .content-wrap {
+            display: flex;
+            flex-grow: 1; 
+            height: 100%; /* 親要素(movie-item-link)の高さに合わせる */
+        }
+
+        /* デスクトップ用ポスター */
+        .poster { 
+            width: 100px; 
+            height: auto; 
+            margin-right: 20px; 
+            flex-shrink: 0; 
+            flex-grow: 0; 
+            display: flex;
+        }
+        .poster img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            border-radius: 4px; 
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); 
+        }
         
-        .info { flex-grow: 1; }
-        .title a { font-size: 1.2em; font-weight: 600; color: #333; text-decoration: none; }
-        .title a:hover { color: #0088cc; text-decoration: underline; }
+        .info { 
+            flex-grow: 1; 
+            display: flex; 
+            flex-direction: column;
+            justify-content: space-between; /* 上から下に要素を広げる */
+        }
         
+        .title-and-badges { 
+             display: flex;
+             align-items: center;
+        }
+        .title { 
+            font-size: 1.2em; 
+            font-weight: 600; 
+            color: #333; 
+            margin-right: 10px; 
+        }
+
+        .movie-item-link:hover .title {
+             color: #0088cc;
+             text-decoration: underline;
+        }
+        
+        .vod-badges {
+            display: flex;
+            gap: 5px; 
+            margin-top: 5px; 
+            margin-bottom: 5px; 
+        }
+        .vod-badge {
+            font-size: 0.75em;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: none; 
+            border: 1px solid; 
+            white-space: nowrap;
+        }
+        .vod-badge.Amazon {
+            color: #0088cc; 
+            border-color: #0088cc;
+        }
+        .vod-badge.Netflix {
+            color: #e50914; 
+            border-color: #e50914;
+        }
+
         .release-date, .genre-info { font-size: 0.85em; color: #777; margin-bottom: 5px; line-height: 1.4; }
         
-        .score { font-size: 1.1em; font-weight: bold; color: #666; }
+        .score-block {
+             /* 評価とスコアバーのブロック */
+             display: flex;
+             flex-direction: column;
+        }
+        .score { 
+            font-size: 1.3em; 
+            font-weight: bold; 
+            color: #666; 
+        }
+
         .score-bar { height: 10px; background-color: #e0e0e0; border-radius: 5px; margin-top: 5px; width: 100%; max-width: 200px; }
         .score-fill { height: 100%; border-radius: 5px; background-color: #ffaa00; transition: width 0.5s; }
-        .rating-highlight { background-color: #fff9e6; border-left: 5px solid #ffcc33; padding-left: 10px; }
+        
+        .rating-highlight { 
+            background-color: #fff9e6; 
+            border-left: 5px solid #ffcc33; 
+        }
         .rating-highlight .score { color: #ffaa00; font-weight: bold; }
 
-        /* ★★★ レスポンシブ対応 (画面幅600px以下で適用) ★★★ */
+        /* レスポンシブ対応 (画面幅600px以下で適用) */
         @media (max-width: 600px) {
             body { padding: 5px; }
             .container { padding: 10px; }
             h1 { font-size: 1.4em; margin-bottom: 15px; }
             
-            /* スマホで縦並びにする（ランクとコンテンツを分けて表示） */
-            .movie-item { 
-                flex-direction: column; /* ★★★ 縦並びにする ★★★ */
-                align-items: flex-start; /* 左寄せ */
+            .movie-item-link { 
+                /* align-items: flex-startを削除 */
+                flex-direction: column; 
                 padding: 10px 5px;
             }
             
-            /* 順位の表示をコンテンツの上部に移動 */
             .rank { 
+                height: auto;
+                align-items: flex-start; 
+                justify-content: flex-start;
                 font-size: 1.8em; 
                 width: auto; 
-                margin: 0 0 10px 0; /* 下に余白 */
-                align-self: flex-start; /* 親要素の幅に関わらず左寄せ */
+                margin: 0 0 10px 0; 
+                align-self: flex-start; 
             }
             
-            /* ポスターと情報ブロックを横に並べるラッパー */
             .content-wrap {
-                display: flex;
-                width: 100%; /* 全幅使用 */
-                align-items: flex-start;
+                width: 100%; 
+                height: auto;
+                /* ★★★ 変更1: ポスターと情報ブロックを縦に広げる ★★★ */
+                align-items: stretch;
             }
 
+            /* スマホ用: ポスターの高さが情報欄全体に広がるように */
             .poster { 
-                width: 60px; /* ポスターを小さく */
-                height: 85px; 
+                /* ★★★ 変更2: 高さを自動にし、幅を少し大きく ★★★ */
+                width: 80px; 
+                height: auto; /* ポスターの高さがinfoに合わせられるように */
                 margin-right: 10px; 
+            }
+            .poster img {
+                /* ★★★ 変更3: 画像全体が見えるように contain に変更 ★★★ */
+                object-fit: contain; 
             }
             
             .info { 
+                /* ★★★ 変更4: infoを縦いっぱいに広げ、情報を分散配置 ★★★ */
+                height: 100%;
+                justify-content: space-between; 
                 min-width: 0; 
             }
             
-            .title a { font-size: 1.0em; }
+            .title { font-size: 1.0em; }
             
+            .title-and-badges { 
+                 flex-direction: column; 
+                 align-items: flex-start;
+                 margin-bottom: 5px; 
+            }
+            .vod-badges {
+                 margin-top: 5px;
+                 margin-bottom: 5px;
+            }
+
             .release-date, .genre-info { 
                 font-size: 0.75em; 
                 margin-bottom: 2px; 
@@ -89,18 +204,18 @@
             }
             
             .score {
-                 font-size: 0.9em;
+                 font-size: 1.1em; 
             }
             
             .score-bar { 
-                max-width: 100%; /* 幅をコンテンツに合わせる */
+                max-width: 100%; 
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Amazon Prime Video 映画ランキング</h1>
+        <h1>Prime Video & Netflix 統合ランキング</h1>
         
         
         
@@ -109,59 +224,51 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top3">#1</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/htx8bobj8v0ed4eu2f68wwlkxicy/_.jpg" alt="ショーシャンクの空に ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
-                        
-                        <a href="https://filmarks.com/movies/19119" target="_blank">ショーシャンクの空に</a>
-                        
-                    </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：1995年06月03日</div>
-                    <div class="score">★4.3 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 86.0%;"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        
-        
-        
-        
-        
-        <div class="movie-item rating-highlight">
+            <a href="https://filmarks.com/movies/19119" target="_blank" class="movie-item-link">
             
-            <div class="rank top3">#2</div>
+
+                <div class="rank top3">#1</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/htx8bobj8v0ed4eu2f68wwlkxicy/_.jpg" alt="ショーシャンクの空に ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ショーシャンクの空に
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：1995年06月03日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.3</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 86.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/413026uphxt8tbmq7gxjjmzuf92d/_.jpg" alt="最強のふたり ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
-                        
-                        <a href="https://filmarks.com/movies/24821" target="_blank">最強のふたり</a>
-                        
-                    </div>
-                    <div class="genre-info">ジャンル：ドラマ, コメディ</div>
-                    <div class="release-date">上映日：2012年09月01日</div>
-                    <div class="score">★4.2 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 84.0%;"></div>
-                    </div>
-                </div>
-            </div>
+            </a>
+            
+
         </div>
         
         
@@ -171,28 +278,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top3">#3</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tfucqcrtshiqkgmndxkx2egq7b3h/_.jpg" alt="ファーストキス　1ST KISS ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/7420" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top3">#2</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/118093" target="_blank">ファーストキス　1ST KISS</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/2hknzsxz61u1slx2fm0567pavdgs/_.jpg" alt="バック・トゥ・ザ・フューチャー ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：恋愛</div>
-                    <div class="release-date">上映日：2025年02月07日</div>
-                    <div class="score">★4.2 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 84.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    バック・トゥ・ザ・フューチャー
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：SF, コメディ, アドベンチャー・冒険</div>
+                            <div class="release-date">上映日：1985年12月07日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.3</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 86.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -202,28 +330,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top10">#4</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/wo6uoscueefvsok4icmm3fxggp6m/_.jpg" alt="インターステラー ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/118093" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top3">#3</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/55572" target="_blank">インターステラー</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tfucqcrtshiqkgmndxkx2egq7b3h/_.jpg" alt="ファーストキス　1ST KISS ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ, SF, アドベンチャー・冒険</div>
-                    <div class="release-date">上映日：2014年11月22日</div>
-                    <div class="score">★4.2 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 84.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ファーストキス　1ST KISS
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：恋愛</div>
+                            <div class="release-date">上映日：2025年02月07日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.2</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 84.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -233,28 +382,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top10">#5</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/zuh7tkci5j38bewmrzrl55da3019/_.jpg" alt="グリーンブック ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/55572" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top10">#4</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/80582" target="_blank">グリーンブック</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/wo6uoscueefvsok4icmm3fxggp6m/_.jpg" alt="インターステラー ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ, コメディ</div>
-                    <div class="release-date">上映日：2019年03月01日</div>
-                    <div class="score">★4.2 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 84.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    インターステラー
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, SF, アドベンチャー・冒険</div>
+                            <div class="release-date">上映日：2014年11月22日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.2</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 84.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -264,28 +434,51 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top10">#6</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/0au6eazqqzh5ykpfdc73fkyoplbb/_.jpg" alt="グッド・ウィル・ハンティング／旅立ち ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/29792" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top10">#5</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/29792" target="_blank">グッド・ウィル・ハンティング／旅立ち</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/0au6eazqqzh5ykpfdc73fkyoplbb/_.jpg" alt="グッド・ウィル・ハンティング／旅立ち ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：1998年03月07日</div>
-                    <div class="score">★4.2 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 84.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    グッド・ウィル・ハンティング／旅立ち
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：1998年03月07日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.2</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 84.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -295,28 +488,51 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top10">#7</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/cmvugttv6mvelz794nhao3o9ochn/_.jpg" alt="PERFECT DAYS ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/80582" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top10">#6</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/109454" target="_blank">PERFECT DAYS</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/zuh7tkci5j38bewmrzrl55da3019/_.jpg" alt="グリーンブック ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2023年12月22日</div>
-                    <div class="score">★4.1 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 82.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    グリーンブック
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, コメディ</div>
+                            <div class="release-date">上映日：2019年03月01日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.2</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 84.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -326,28 +542,51 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top10">#8</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/lw5v94sotqu717xytheva1u1m2ty/_.jpg" alt="ウィキッド ふたりの魔女 ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/24821" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top10">#7</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/103092" target="_blank">ウィキッド ふたりの魔女</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/413026uphxt8tbmq7gxjjmzuf92d/_.jpg" alt="最強のふたり ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：恋愛, ミュージカル, ファンタジー</div>
-                    <div class="release-date">上映日：2025年03月07日</div>
-                    <div class="score">★4.1 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 82.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    最強のふたり
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, コメディ</div>
+                            <div class="release-date">上映日：2012年09月01日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.2</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 84.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -357,28 +596,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top10">#9</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/sgeolx3pkvnzud50ybueikh0wvi8/_.jpg" alt="怪物 ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/68660" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top10">#8</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/106550" target="_blank">怪物</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/00xc4n6vl8itdujajby90aawjnfh/_.jpg" alt="ワンダー 君は太陽 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2023年06月02日</div>
-                    <div class="score">★4.1 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 82.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ワンダー 君は太陽
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, ファミリー</div>
+                            <div class="release-date">上映日：2018年06月15日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.2</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 84.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -388,28 +648,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank top10">#10</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/ji5iuod047fee4d5fcjuoqre8bby/_.jpg" alt="フロントライン ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/109454" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top10">#9</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/120266" target="_blank">フロントライン</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/cmvugttv6mvelz794nhao3o9ochn/_.jpg" alt="PERFECT DAYS ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2025年06月13日</div>
-                    <div class="score">★4.1 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 82.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    PERFECT DAYS
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2023年12月22日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 82.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -419,28 +700,51 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank ">#11</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/xw3hxoitzi7yq7g461j9ouuftjwt/_.jpg" alt="ルックバック ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/5603" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank top10">#10</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/114872" target="_blank">ルックバック</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/j2qemv11498zf7ijwhsdchtr64st/_.jpg" alt="インセプション ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：アニメ</div>
-                    <div class="release-date">上映日：2024年06月28日</div>
-                    <div class="score">★4.1 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 82.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    インセプション
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：SF, アクション, アドベンチャー・冒険</div>
+                            <div class="release-date">上映日：2010年07月23日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 82.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -450,28 +754,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank ">#12</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/j2qemv11498zf7ijwhsdchtr64st/_.jpg" alt="インセプション ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/14908" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#11</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/5603" target="_blank">インセプション</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/bz7e343rxj8ks7we7i027hzq77kf/_.jpg" alt="いまを生きる ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：SF, アクション, アドベンチャー・冒険</div>
-                    <div class="release-date">上映日：2010年07月23日</div>
-                    <div class="score">★4.1 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 82.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    いまを生きる
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：1990年03月24日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 82.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -481,28 +806,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank ">#13</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/q2skrgo7masxgz0hobx5zeu541fp/_.jpg" alt="いつかの君にもわかること ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/106550" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#12</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/93025" target="_blank">いつかの君にもわかること</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/sgeolx3pkvnzud50ybueikh0wvi8/_.jpg" alt="怪物 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2023年02月17日</div>
-                    <div class="score">★4.0 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 80.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    怪物
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2023年06月02日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 82.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -512,28 +858,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank ">#14</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/zua6f0t2yje4xzfk4c49gluwqdvt/_.jpg" alt="PERFECT BLUE ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/120266" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#13</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/13580" target="_blank">PERFECT BLUE</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/ji5iuod047fee4d5fcjuoqre8bby/_.jpg" alt="フロントライン ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：アニメ</div>
-                    <div class="release-date">上映日：1998年02月28日</div>
-                    <div class="score">★4.0 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 80.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    フロントライン
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2025年06月13日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 82.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -543,28 +910,49 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank ">#15</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/d3ykkfq9y289a35aj004aekhp0r7/_.jpg" alt="夜明けのすべて ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/114872" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#14</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/108265" target="_blank">夜明けのすべて</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/xw3hxoitzi7yq7g461j9ouuftjwt/_.jpg" alt="ルックバック ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2024年02月09日</div>
-                    <div class="score">★4.0 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 80.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ルックバック
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ</div>
+                            <div class="release-date">上映日：2024年06月28日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 82.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -574,28 +962,469 @@
         
         <div class="movie-item rating-highlight">
             
-            <div class="rank ">#16</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tzxxi75wlo486xro5o9auarqtih4/_.jpg" alt="ラストマイル ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/103092" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#15</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/113843" target="_blank">ラストマイル</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/lw5v94sotqu717xytheva1u1m2ty/_.jpg" alt="ウィキッド ふたりの魔女 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：サスペンス</div>
-                    <div class="release-date">上映日：2024年08月23日</div>
-                    <div class="score">★4.0 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 80.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ウィキッド ふたりの魔女
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：恋愛, ミュージカル, ファンタジー</div>
+                            <div class="release-date">上映日：2025年03月07日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 82.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/96267" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#16</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/8rva0ge6m1tpcc2z7kdh8sw1qf8y/_.jpg" alt="劇場版 呪術廻戦 0 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    劇場版 呪術廻戦 0
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ</div>
+                            <div class="release-date">上映日：2021年12月24日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/83796" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#17</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/exi19x85f6xkbu2j8r8vkfy9ph8r/_.jpg" alt="パラサイト 半地下の家族 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    パラサイト 半地下の家族
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, コメディ, サスペンス</div>
+                            <div class="release-date">上映日：2020年01月10日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/108265" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#18</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/d3ykkfq9y289a35aj004aekhp0r7/_.jpg" alt="夜明けのすべて ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    夜明けのすべて
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2024年02月09日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/13580" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#19</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/zua6f0t2yje4xzfk4c49gluwqdvt/_.jpg" alt="PERFECT BLUE ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    PERFECT BLUE
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ</div>
+                            <div class="release-date">上映日：1998年02月28日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/113843" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#20</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tzxxi75wlo486xro5o9auarqtih4/_.jpg" alt="ラストマイル ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ラストマイル
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：サスペンス</div>
+                            <div class="release-date">上映日：2024年08月23日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/93025" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#21</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/q2skrgo7masxgz0hobx5zeu541fp/_.jpg" alt="いつかの君にもわかること ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    いつかの君にもわかること
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2023年02月17日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/86962" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#22</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/d9prvvw35vu0tgt80s7x895ppeep/_.jpg" alt="劇場版「鬼滅の刃」無限列車編 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    劇場版「鬼滅の刃」無限列車編
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ</div>
+                            <div class="release-date">上映日：2020年10月16日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item rating-highlight">
+            
+            
+            <a href="https://filmarks.com/movies/80819" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#23</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/9kzr0exmf7gsun5vw7f9r04f1ylc/_.jpg" alt="ジョーカー ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ジョーカー
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, クライム, スリラー</div>
+                            <div class="release-date">上映日：2019年10月04日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★4.0</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 80.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -605,28 +1434,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#17</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/9mu914z77tzoqseixy64l38eqf48/_.jpg" alt="ANORA アノーラ ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/87476" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#24</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/116039" target="_blank">ANORA アノーラ</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tial759ujz2kda3nxktrptgskqjb/_.jpg" alt="花束みたいな恋をした ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2025年02月28日</div>
-                    <div class="score">★3.9 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 78.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    花束みたいな恋をした
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：恋愛</div>
+                            <div class="release-date">上映日：2021年01月29日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -636,28 +1486,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#18</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tial759ujz2kda3nxktrptgskqjb/_.jpg" alt="花束みたいな恋をした ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/117563" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#25</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/87476" target="_blank">花束みたいな恋をした</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/nyfocscvhxaibv0modx4nnh30ry6/_.jpg" alt="正体 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：恋愛</div>
-                    <div class="release-date">上映日：2021年01月29日</div>
-                    <div class="score">★3.9 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 78.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    正体
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：サスペンス</div>
+                            <div class="release-date">上映日：2024年11月29日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -667,28 +1538,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#19</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/yyq7w799n8qih055l0mg4ieujky8/_.jpg" alt="教皇選挙 ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/65931" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#26</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/115976" target="_blank">教皇選挙</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/kekyvpteaiuqhbq3njcgip0i5akp/_.jpg" alt="君の名は。 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：N/A</div>
-                    <div class="release-date">上映日：2025年03月20日</div>
-                    <div class="score">★3.9 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 78.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    君の名は。
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ, 恋愛</div>
+                            <div class="release-date">上映日：2016年08月26日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -698,28 +1590,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#20</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/054iimxn5ky99zgl29kft48ob3tl/_.jpeg" alt="インディ・ジョーンズと運命のダイヤル ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/62215" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#27</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/67234" target="_blank">インディ・ジョーンズと運命のダイヤル</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/fchf11z32jxx5lm6yihei0v4gjd5/_.jpg" alt="ラ・ラ・ランド ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：アクション, アドベンチャー・冒険</div>
-                    <div class="release-date">上映日：2023年06月30日</div>
-                    <div class="score">★3.8 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 76.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ラ・ラ・ランド
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：恋愛, ミュージカル</div>
+                            <div class="release-date">上映日：2017年02月24日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -729,28 +1642,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#21</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/dcrmlxna3irwy5dilhenf2z4tunz/_.jpg" alt="笑いのカイブツ ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/16236" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#28</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/98567" target="_blank">笑いのカイブツ</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/xva8la0gziey6p9jumy598bjs29p/_.jpg" alt="容疑者Xの献身 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2024年01月05日</div>
-                    <div class="score">★3.8 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 76.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    容疑者Xの献身
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, ミステリー</div>
+                            <div class="release-date">上映日：2008年10月04日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -760,28 +1694,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#22</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/zil7kkgusssrgcfo2qyhyit3lf0y/_.jpg" alt="愛されなくても別に ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/103793" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#29</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/121610" target="_blank">愛されなくても別に</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/ybycqad6kmwgw7zpudabafedeuap/_.jpg" alt="カラオケ行こ！ ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2025年07月04日</div>
-                    <div class="score">★3.8 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 76.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    カラオケ行こ！
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：青春</div>
+                            <div class="release-date">上映日：2024年01月12日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -791,28 +1746,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#23</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/e4vz4ymnxs67ojcha08msa7igey8/_.jpg" alt="あの人が消えた ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/115976" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#30</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/116719" target="_blank">あの人が消えた</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/yyq7w799n8qih055l0mg4ieujky8/_.jpg" alt="教皇選挙 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ミステリー</div>
-                    <div class="release-date">上映日：2024年09月20日</div>
-                    <div class="score">★3.7 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 74.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    教皇選挙
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：N/A</div>
+                            <div class="release-date">上映日：2025年03月20日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -822,28 +1798,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#24</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/qkfmt0rxjrrc7qd4h5iz97aihc7f/_.jpg" alt="場所はいつも旅先だった ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/116039" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#31</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/97204" target="_blank">場所はいつも旅先だった</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/9mu914z77tzoqseixy64l38eqf48/_.jpg" alt="ANORA アノーラ ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドキュメンタリー</div>
-                    <div class="release-date">上映日：2021年10月29日</div>
-                    <div class="score">★3.7 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 74.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ANORA アノーラ
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2025年02月28日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -853,28 +1850,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#25</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/2u6k7bsez32cshjw28a6adnw70i8/_.jpg" alt="ババンババンバンバンパイア ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/104426" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#32</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/115179" target="_blank">ババンババンバンバンパイア</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/s8qdy9p1bxcapviasjji7vc7bjx8/_.jpg" alt="MONDAYS／このタイムループ、上司に気づかせないと終わらない ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：コメディ</div>
-                    <div class="release-date">上映日：2025年07月04日</div>
-                    <div class="score">★3.7 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 74.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    MONDAYS／このタイムループ、上司に気づかせないと終わらない
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：N/A</div>
+                            <div class="release-date">上映日：2022年10月14日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.9</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 78.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -884,28 +1902,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#26</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/xa16tjw0vt5srbblp3gliqhxs1ge/_.jpg" alt="見える子ちゃん ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/37673" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#33</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/119120" target="_blank">見える子ちゃん</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/saf2c4chpgbfg4wmb43mj667hfpq/_.jpg" alt="E.T. ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ホラー, コメディ</div>
-                    <div class="release-date">上映日：2025年06月06日</div>
-                    <div class="score">★3.7 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 74.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    E.T.
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：SF, ファミリー</div>
+                            <div class="release-date">上映日：1982年12月04日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.8</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 76.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -915,28 +1954,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#27</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/c6to7bqdrae0r1l5x084ijzas4bz/_.jpg" alt="違国日記 ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/70717" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#34</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/110304" target="_blank">違国日記</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/3u0o3lpnj5hagv0wzojqgc0xjgwi/_.jpg" alt="ゲット・アウト ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2024年06月07日</div>
-                    <div class="score">★3.7 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 74.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ゲット・アウト
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ホラー, ミステリー, スリラー</div>
+                            <div class="release-date">上映日：2017年10月27日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.8</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 76.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -946,28 +2006,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#28</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/22ouxcg771u4g5vrs8h27gln18tf/_.jpg" alt="クレイヴン・ザ・ハンター ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/100650" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#35</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/97342" target="_blank">クレイヴン・ザ・ハンター</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/7cxcwk2bvp8ppyhbdyqkyp538ugn/_.jpg" alt="すずめの戸締まり ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：アクション</div>
-                    <div class="release-date">上映日：2024年12月13日</div>
-                    <div class="score">★3.6 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 72.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    すずめの戸締まり
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ</div>
+                            <div class="release-date">上映日：2022年11月11日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.8</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 76.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -977,28 +2058,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#29</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/x6d1xoa4onov858cne4d6d4zrxm7/_.jpg" alt="DROP／ドロップ ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/124633" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#36</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/121290" target="_blank">DROP／ドロップ</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/ltr4o53b9ey8m1i63qzwkyd2xhs4/_.jpg" alt="カラメロ ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ミステリー, スリラー</div>
-                    <div class="release-date">上映日：2025年07月11日</div>
-                    <div class="score">★3.6 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 72.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    カラメロ
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, コメディ</div>
+                            <div class="release-date">上映日：N/A</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.8</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 76.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -1008,28 +2110,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#30</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/dm7xhsekkff23lfqg2eppk6d7juq/_.jpg" alt="雨の日は会えない、晴れた日は君を想う ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/67234" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#37</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/59159" target="_blank">雨の日は会えない、晴れた日は君を想う</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/054iimxn5ky99zgl29kft48ob3tl/_.jpeg" alt="インディ・ジョーンズと運命のダイヤル ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ドラマ</div>
-                    <div class="release-date">上映日：2017年02月18日</div>
-                    <div class="score">★3.6 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 72.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    インディ・ジョーンズと運命のダイヤル
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アクション, アドベンチャー・冒険</div>
+                            <div class="release-date">上映日：2023年06月30日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.8</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 76.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -1039,28 +2162,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#31</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tt4t3ewg1bm5uo0tmqpn9fu7qpkh/_.jpg" alt="#真相をお話しします ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/121610" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#38</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/120071" target="_blank">#真相をお話しします</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/zil7kkgusssrgcfo2qyhyit3lf0y/_.jpg" alt="愛されなくても別に ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ミステリー</div>
-                    <div class="release-date">上映日：2025年04月25日</div>
-                    <div class="score">★3.6 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 72.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    愛されなくても別に
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2025年07月04日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.8</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 76.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -1070,28 +2214,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#32</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/un8mhbn6au26ik92ckllrq4x8xc5/_.jpg" alt="夏目アラタの結婚 ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/98567" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#39</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/116090" target="_blank">夏目アラタの結婚</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/dcrmlxna3irwy5dilhenf2z4tunz/_.jpg" alt="笑いのカイブツ ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：サスペンス</div>
-                    <div class="release-date">上映日：2024年09月06日</div>
-                    <div class="score">★3.5 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 70.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    笑いのカイブツ
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2024年01月05日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.8</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 76.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -1101,28 +2266,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#33</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/3cthq0hqr3q7ygw27paz3z5nf2kr/_.jpg" alt="秒速5センチメートル ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/116719" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#40</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/22736" target="_blank">秒速5センチメートル</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/e4vz4ymnxs67ojcha08msa7igey8/_.jpg" alt="あの人が消えた ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：アニメ, ドラマ, 青春</div>
-                    <div class="release-date">上映日：2007年03月03日</div>
-                    <div class="score">★3.5 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 70.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    あの人が消えた
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ミステリー</div>
+                            <div class="release-date">上映日：2024年09月20日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -1132,28 +2318,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#34</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/ykgjpm1yoseqbfyf5qbgeed1ynz7/_.jpg" alt="スオミの話をしよう ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/110304" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#41</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/114075" target="_blank">スオミの話をしよう</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/c6to7bqdrae0r1l5x084ijzas4bz/_.jpg" alt="違国日記 ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：コメディ, サスペンス</div>
-                    <div class="release-date">上映日：2024年09月13日</div>
-                    <div class="score">★3.3 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 66.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    違国日記
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2024年06月07日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -1163,28 +2370,49 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#35</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/q7utb5wocmlck3w80xicuwph2xij/_.jpg" alt="罪と悪 ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/119120" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#42</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/112911" target="_blank">罪と悪</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/xa16tjw0vt5srbblp3gliqhxs1ge/_.jpg" alt="見える子ちゃん ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：サスペンス, ミステリー</div>
-                    <div class="release-date">上映日：2024年02月02日</div>
-                    <div class="score">★3.3 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 66.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    見える子ちゃん
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ホラー, コメディ</div>
+                            <div class="release-date">上映日：2025年06月06日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
         </div>
         
         
@@ -1194,28 +2422,1093 @@
         
         <div class="movie-item ">
             
-            <div class="rank ">#36</div>
             
-            <div class="content-wrap">
-                <div class="poster">
-                    
-                    <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/wb4y9jtlfxe75ra7vjwo3bdbsy3f/_.jpg" alt="事故物件ゾク 恐い間取り ポスター">
-                    
-                </div>
-                <div class="info">
-                    <div class="title">
+            <a href="https://filmarks.com/movies/97204" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#43</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
                         
-                        <a href="https://filmarks.com/movies/120783" target="_blank">事故物件ゾク 恐い間取り</a>
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/qkfmt0rxjrrc7qd4h5iz97aihc7f/_.jpg" alt="場所はいつも旅先だった ポスター">
                         
                     </div>
-                    <div class="genre-info">ジャンル：ホラー</div>
-                    <div class="release-date">上映日：2025年07月25日</div>
-                    <div class="score">★3.1 / 5.0</div>
-                    <div class="score-bar">
-                        <div class="score-fill" style="width: 62.0%;"></div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    場所はいつも旅先だった
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドキュメンタリー</div>
+                            <div class="release-date">上映日：2021年10月29日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/115179" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#44</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/2u6k7bsez32cshjw28a6adnw70i8/_.jpg" alt="ババンババンバンバンパイア ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ババンババンバンバンパイア
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：コメディ</div>
+                            <div class="release-date">上映日：2025年07月04日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/100409" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#45</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/xuj6za0re8uknn58bko63rrr6goy/_.jpeg" alt="ヘルドッグス ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ヘルドッグス
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：N/A</div>
+                            <div class="release-date">上映日：2022年09月16日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/34139" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#46</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/zd6vtcnyenj0dl4erpi688op72cb/_.jpg" alt="ロミオ&ジュリエット ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ロミオ&ジュリエット
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：恋愛</div>
+                            <div class="release-date">上映日：1997年04月19日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/121083" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#47</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/ej2yex4zk02rdpazx9zous8jgdue/_.jpg" alt="ライフリスト ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    ライフリスト
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ, 恋愛, コメディ</div>
+                            <div class="release-date">上映日：N/A</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/82210" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#48</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/dvvl2ssrbuohe13oo2kyobfkdrfp/_.jpg" alt="天気の子 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    天気の子
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ</div>
+                            <div class="release-date">上映日：2019年07月19日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/40641" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#49</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/39twt7w5tox9qmubjmvwupyp33pv/_.jpg" alt="13 ラブ 30 サーティン・ラブ・サーティ ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    13 ラブ 30 サーティン・ラブ・サーティ
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：N/A</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.7</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 74.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/121111" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#50</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/z12hqhm8ecr1ium3gvl26rxk393h/_.jpg" alt="グッドニュース ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    グッドニュース
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：コメディ, アクション, サスペンス</div>
+                            <div class="release-date">上映日：N/A</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.6</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 72.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/97342" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#51</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/22ouxcg771u4g5vrs8h27gln18tf/_.jpg" alt="クレイヴン・ザ・ハンター ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    クレイヴン・ザ・ハンター
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アクション</div>
+                            <div class="release-date">上映日：2024年12月13日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.6</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 72.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/53528" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#52</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/2z5rjnprg60gkuuphvtuc7me88hy/_.jpg" alt="真夏の方程式 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    真夏の方程式
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：サスペンス</div>
+                            <div class="release-date">上映日：2013年06月29日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.6</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 72.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/121290" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#53</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/x6d1xoa4onov858cne4d6d4zrxm7/_.jpg" alt="DROP／ドロップ ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    DROP／ドロップ
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ミステリー, スリラー</div>
+                            <div class="release-date">上映日：2025年07月11日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.6</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 72.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/120071" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#54</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/tt4t3ewg1bm5uo0tmqpn9fu7qpkh/_.jpg" alt="#真相をお話しします ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    #真相をお話しします
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ミステリー</div>
+                            <div class="release-date">上映日：2025年04月25日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.6</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 72.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/59159" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#55</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/dm7xhsekkff23lfqg2eppk6d7juq/_.jpg" alt="雨の日は会えない、晴れた日は君を想う ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    雨の日は会えない、晴れた日は君を想う
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ドラマ</div>
+                            <div class="release-date">上映日：2017年02月18日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.6</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 72.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/121052" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#56</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/rr29dz76b3vzf851vho065ukyp7j/_.jpg" alt="木曜殺人クラブ ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    木曜殺人クラブ
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：コメディ, クライム, ミステリー</div>
+                            <div class="release-date">上映日：N/A</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.6</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 72.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/22736" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#57</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/3cthq0hqr3q7ygw27paz3z5nf2kr/_.jpg" alt="秒速5センチメートル ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    秒速5センチメートル
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：アニメ, ドラマ, 青春</div>
+                            <div class="release-date">上映日：2007年03月03日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.5</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 70.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/98746" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#58</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/f1k9xu3nk3v7syk7xfy2vsxqkcy6/_.jpg" alt="死刑にいたる病 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    死刑にいたる病
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：サスペンス</div>
+                            <div class="release-date">上映日：2022年05月06日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.5</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 70.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/116090" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#59</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/un8mhbn6au26ik92ckllrq4x8xc5/_.jpg" alt="夏目アラタの結婚 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    夏目アラタの結婚
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：サスペンス</div>
+                            <div class="release-date">上映日：2024年09月06日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.5</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 70.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/114075" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#60</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/ykgjpm1yoseqbfyf5qbgeed1ynz7/_.jpg" alt="スオミの話をしよう ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    スオミの話をしよう
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：コメディ, サスペンス</div>
+                            <div class="release-date">上映日：2024年09月13日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.3</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 66.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/112911" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#61</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/q7utb5wocmlck3w80xicuwph2xij/_.jpg" alt="罪と悪 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    罪と悪
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：サスペンス, ミステリー</div>
+                            <div class="release-date">上映日：2024年02月02日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.3</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 66.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/121053" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#62</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/af22ddz765m0im328azqnsyuhh5c/_.jpg" alt="第10客室の女 ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    第10客室の女
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ホラー, スリラー</div>
+                            <div class="release-date">上映日：N/A</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Netflix">Netflix</span>
+                                
+                            </div>
+
+                            <div class="score">★3.3</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 66.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
+        </div>
+        
+        
+        
+        
+        
+        
+        <div class="movie-item ">
+            
+            
+            <a href="https://filmarks.com/movies/120783" target="_blank" class="movie-item-link">
+            
+
+                <div class="rank ">#63</div>
+                
+                <div class="content-wrap">
+                    <div class="poster">
+                        
+                        <img src="https://d2ueuvlup6lbue.cloudfront.net/variants/production/store/fitpad/300/420/wb4y9jtlfxe75ra7vjwo3bdbsy3f/_.jpg" alt="事故物件ゾク 恐い間取り ポスター">
+                        
+                    </div>
+                    <div class="info">
+                        
+                        <div>
+                            <div class="title-and-badges">
+                                <div class="title">
+                                    事故物件ゾク 恐い間取り
+                                </div>
+                            </div>
+                            <div class="genre-info">ジャンル：ホラー</div>
+                            <div class="release-date">上映日：2025年07月25日</div>
+                        </div>
+                        
+                        <div class="score-block">
+                            <div class="vod-badges">
+                                
+                                <span class="vod-badge Amazon">Amazon</span>
+                                
+                            </div>
+
+                            <div class="score">★3.1</div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 62.0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            
+            </a>
+            
+
         </div>
         
     </div>
