@@ -1,4 +1,4 @@
-# 【最終確定版：スマホポスター画像サイズ調整、VODラベル調整、評価調整、重複排除、レスポンシブ、全体リンク】
+# 【最終確定版：複数ジャンルOR検索対応、指定ジャンル限定、サイト文言保持】
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -12,8 +12,7 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8') 
 
 # --- 設定 ---
-# ページ数を1に設定
-TOTAL_PAGES = 5 
+TOTAL_PAGES = 10 
 BASE_DOMAIN = "https://filmarks.com" 
 
 # スクレピング対象のVODランキングURLリスト
@@ -21,6 +20,27 @@ VOD_URLS = {
     "Amazon": "/list/vod/prime_video?page={}",
     "Netflix": "/list/vod/netflix?page={}"
 }
+
+# ★★★ フィルタリングに使用するジャンルの定義と名称マッピング ★★★
+# KEY: Filmarksから取得される可能性のある生データ
+# VALUE: フィルタリングボタンに使用する名称 (指定された7つに限定)
+TARGET_GENRES_MAP = {
+    "SF": "SF",
+    "アクション": "アクション",
+    "アドベンチャー": "冒険",
+    "冒険": "冒険",
+    "アドベンチャー・冒険": "冒険", # Filmarksの表記を「冒険」にマッピング
+    "クライム": "クライム",
+    "ファミリー": "ファミリー",
+    "ファンタジー": "ファンタジー",
+    "アニメ": "アニメ",
+    "アニメーション": "アニメ",
+    # ★★★ 指定されていないジャンルはここで除外されます ★★★
+}
+
+# 最終的にウェブページに出力するジャンルボタンの名称リスト（重複なし、ソート済み）
+# 意図しない重複を除外するためset()を使用し、指定された7ジャンルに合致するもののみ表示する
+FINAL_GENRE_BUTTONS = sorted(list(set(TARGET_GENRES_MAP.values())))
 # --- /設定 ---
 
 # HTTPリクエストのヘッダー情報
@@ -28,8 +48,8 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
 
-# 映画データを格納する辞書
 movie_data_map = {}
+all_processed_genres = set() # フィルタリング用の加工済みジャンル名（例: 冒険）を収集
 
 print("スクレイピングを開始します...")
 
@@ -101,30 +121,46 @@ for vod_name_short, url_suffix in VOD_URLS.items():
                 if not movie_id:
                     continue
 
-                # === オプション情報の抽出 ===
+                # === オプション情報の抽出 (画像URL, 上映日) ===
                 poster_url = None
                 try:
                     poster_element = content_cassette.select_one('div.p-content-cassette__jacket img') 
                     if poster_element:
+                        # 'data-src'または'src'から画像URLを取得
                         poster_url = poster_element.get('data-src') or poster_element.get('src')
                 except Exception:
                     pass
 
                 release_date = "上映日：N/A"
                 try:
-                    # 警告解消のための修正済セレクタ
+                    # Filmarksの構造に合わせたセレクタで上映日を取得
                     release_date_element = content_cassette.select_one('.p-content-cassette__other-info-title:-soup-contains("上映日：") + span')
                     if release_date_element:
                         release_date = f"上映日：{release_date_element.text.strip()}"
                 except Exception:
-                     pass
+                    pass 
 
+                # === ジャンル情報の抽出と加工（ここが重要） ===
+                raw_genres = [] # Filmarksのオリジナル文言
+                processed_genres = set() # フィルタリング用の加工済みジャンル名（例: 冒険）
                 genres_info = "ジャンル：N/A"
                 try:
                     genre_elements = content_cassette.select('.p-content-cassette__other-info.genres_and_distributor .genres a')
-                    genres = ', '.join([g.text.strip() for g in genre_elements])
-                    if genres:
-                        genres_info = f"ジャンル：{genres}"
+                    raw_genres = [g.text.strip() for g in genre_elements]
+                    
+                    if raw_genres:
+                        # フィルタリング対象ジャンルの加工と抽出
+                        for g in raw_genres:
+                            processed_g = TARGET_GENRES_MAP.get(g) # マッピングに基づいて加工
+                            if processed_g:
+                                processed_genres.add(processed_g) # 加工後のジャンル名をセットに追加
+                        
+                        # HTML表示用の文字列はFilmarksのオリジナル文言を使用
+                        unique_raw_genres = list(set(raw_genres))
+                        genres_info = f"ジャンル：{', '.join(unique_raw_genres)}"
+                        
+                        # 最終的なフィルタリング用ジャンルリストをセットに追加
+                        all_processed_genres.update(processed_genres)
                 except Exception:
                     pass 
 
@@ -138,7 +174,8 @@ for vod_name_short, url_suffix in VOD_URLS.items():
                         '評価': score, 
                         '画像URL': poster_url,
                         '上映日': release_date,
-                        'ジャンル': genres_info, 
+                        'ジャンル': genres_info, # Filmarksのオリジナル文言を使用
+                        'ジャンルリスト': list(processed_genres), # フィルタリング用の加工済みジャンルリスト
                         '詳細URL': detail_url,
                         'vod_sources': [vod_name_short] 
                     }
@@ -149,6 +186,9 @@ for vod_name_short, url_suffix in VOD_URLS.items():
 
 # 収集したデータをDataFrameに変換 (辞書の値を取り出す)
 df = pd.DataFrame(list(movie_data_map.values()))
+
+# 実際に収集されたジャンルのみに絞り、ソート
+display_genres = sorted([g for g in FINAL_GENRE_BUTTONS if g in all_processed_genres])
 
 # --- HTML生成と出力 ---
 if df.empty:
@@ -175,11 +215,42 @@ else:
         /* デスクトップ/共通スタイル */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-        h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 30px; text-align: center; }
+        h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
         
+        /* ★★★ ジャンルフィルターコンテナのスタイル ★★★ */
+        .genre-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px 0 30px 0;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 30px;
+        }
+
+        .genre-button {
+            background-color: #f0f0f0;
+            color: #555;
+            border: 1px solid #ccc;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+            outline: none;
+            user-select: none;
+        }
+
+        .genre-button.active {
+            background-color: #0088cc;
+            color: white;
+            border-color: #0088cc;
+        }
+        /* ★★★ /ジャンルフィルターコンテナのスタイル ★★★ */
+
+
         .movie-item-link { 
             display: flex; 
-            align-items: stretch; /* デスクトップ: 子要素を縦方向に引き伸ばす */
+            align-items: stretch; 
             padding: 15px; 
             border-bottom: 1px dashed #eee; 
             transition: background-color 0.3s; 
@@ -192,6 +263,10 @@ else:
 
         .movie-item {
              border-left: 5px solid transparent; 
+             transition: all 0.3s ease-in-out;
+        }
+        .movie-item.hidden {
+            display: none;
         }
         
         .rank { 
@@ -212,10 +287,9 @@ else:
         .content-wrap {
             display: flex;
             flex-grow: 1; 
-            height: 100%; /* 親要素(movie-item-link)の高さに合わせる */
+            height: 100%; 
         }
 
-        /* デスクトップ用ポスター */
         .poster { 
             width: 100px; 
             height: auto; 
@@ -236,7 +310,7 @@ else:
             flex-grow: 1; 
             display: flex; 
             flex-direction: column;
-            justify-content: space-between; /* 上から下に要素を広げる */
+            justify-content: space-between; 
         }
         
         .title-and-badges { 
@@ -282,7 +356,6 @@ else:
         .release-date, .genre-info { font-size: 0.85em; color: #777; margin-bottom: 5px; line-height: 1.4; }
         
         .score-block {
-             /* 評価とスコアバーのブロック */
              display: flex;
              flex-direction: column;
         }
@@ -307,8 +380,12 @@ else:
             .container { padding: 10px; }
             h1 { font-size: 1.4em; margin-bottom: 15px; }
             
+            .genre-filters {
+                padding: 10px 0 20px 0;
+                margin-bottom: 20px;
+            }
+
             .movie-item-link { 
-                /* align-items: flex-startを削除 */
                 flex-direction: column; 
                 padding: 10px 5px;
             }
@@ -326,24 +403,19 @@ else:
             .content-wrap {
                 width: 100%; 
                 height: auto;
-                /* ★★★ 変更1: ポスターと情報ブロックを縦に広げる ★★★ */
                 align-items: stretch;
             }
 
-            /* スマホ用: ポスターの高さが情報欄全体に広がるように */
             .poster { 
-                /* ★★★ 変更2: 高さを自動にし、幅を少し大きく ★★★ */
                 width: 80px; 
-                height: auto; /* ポスターの高さがinfoに合わせられるように */
+                height: auto; 
                 margin-right: 10px; 
             }
             .poster img {
-                /* ★★★ 変更3: 画像全体が見えるように contain に変更 ★★★ */
                 object-fit: contain; 
             }
             
             .info { 
-                /* ★★★ 変更4: infoを縦いっぱいに広げ、情報を分散配置 ★★★ */
                 height: 100%;
                 justify-content: space-between; 
                 min-width: 0; 
@@ -380,13 +452,19 @@ else:
 <body>
     <div class="container">
         <h1>Prime Video & Netflix 統合ランキング</h1>
+        
+        <div class="genre-filters">
+            {% for genre in display_genres %}
+            <button class="genre-button" data-genre="{{ genre }}">{{ genre }}</button>
+            {% endfor %}
+        </div>
         {% for index, row in data.iterrows() %}
         {% set rank = loop.index %}
         {% set score = row['評価'] %}
         {% set is_highlight = score >= 4.0 %}
         {% set rank_class = 'top3' if rank <= 3 else ('top10' if rank <= 10 else '') %}
         
-        <div class="movie-item {% if is_highlight %}rating-highlight{% endif %}">
+        <div class="movie-item {% if is_highlight %}rating-highlight{% endif %}" data-genres="{{ row['ジャンルリスト'] | join(',') }}">
             
             {% if row['詳細URL'] != '#' %}
             <a href="{{ row['詳細URL'] }}" target="_blank" class="movie-item-link">
@@ -436,18 +514,61 @@ else:
         </div>
         {% endfor %}
     </div>
-</body>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterButtons = document.querySelectorAll('.genre-button');
+            const movieItems = document.querySelectorAll('.movie-item');
+
+            filterButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // クリックされたボタンのアクティブ状態をトグル
+                    this.classList.toggle('active');
+
+                    // 現在アクティブな全てのボタンのジャンルを取得
+                    const activeButtons = document.querySelectorAll('.genre-button.active');
+                    const selectedGenres = Array.from(activeButtons).map(btn => btn.getAttribute('data-genre'));
+
+                    if (selectedGenres.length === 0) {
+                        // アクティブなボタンが一つもない場合 (全表示)
+                        movieItems.forEach(item => {
+                            item.classList.remove('hidden');
+                        });
+                    } else {
+                        // 1つ以上のボタンがアクティブな場合 (OR検索)
+                        movieItems.forEach(item => {
+                            const movieGenresString = item.getAttribute('data-genres');
+                            // カンマ区切りの文字列を配列に変換
+                            const movieGenres = movieGenresString ? movieGenresString.split(',') : [];
+                            
+                            // 映画のジャンルリストに、選択されたジャンルのどれか一つでも含まれているかチェック
+                            const shouldShow = selectedGenres.some(selectedGenre => 
+                                movieGenres.includes(selectedGenre)
+                            );
+
+                            if (shouldShow) {
+                                item.classList.remove('hidden');
+                            } else {
+                                item.classList.add('hidden');
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+    </body>
 </html>
 """)
 
     # データをHTMLテンプレートに渡してレンダリング
-    html_output = html_template.render(data=ranking_df)
+    html_output = html_template.render(data=ranking_df, display_genres=display_genres)
 
     # HTMLファイルを保存
     html_file_path = 'index.html' 
     try:
         with open(html_file_path, 'w', encoding='utf-8') as f:
             f.write(html_output)
-        print(f"\n✨ スタイル付きのウェブページが '{html_file_path}' に保存されました。")
+        print(f"\n✨ スタイルとフィルタ付きのウェブページが '{html_file_path}' に保存されました。")
     except Exception as e:
         print(f"\nHTMLファイルの保存に失敗しました: {e}")
