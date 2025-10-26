@@ -1,4 +1,4 @@
-# 【ホバー時のデザイン調整とあらすじ位置修正版 - CSS微調整 + 更新日追加】
+# 【最終版: 映画/ドラマ絵文字調整 + ジャンルフィルター修正】
 import requests
 from bs4 import BeautifulSoup, Comment 
 import pandas as pd
@@ -9,25 +9,33 @@ from urllib.parse import urljoin
 import sys 
 from datetime import datetime 
 import re 
+import traceback 
 
-# 標準出力をUTF-8に設定
 sys.stdout.reconfigure(encoding='utf-8') 
 
-# --- 設定 (変更なし) ---
-MAX_MOVIES_TO_SCRAPE = 10 
-TOTAL_PAGES = 1 
+# --- 設定 ---
+MAX_MOVIES_TO_SCRAPE = 20000  # 取得上限件数
+TOTAL_PAGES = 10          # 取得ページ数
+SYNOPSIS_PER_PAGE = 100   # ページあたりのあらすじ取得制限を解除
 BASE_DOMAIN = "https://filmarks.com" 
 
-VOD_URLS = { "Amazon": "/list/vod/prime_video?page={}", }
+# 全てのVODとリストタイプを対象
+VOD_LIST_URLS = { 
+    "Amazon": { "映画": "/list/vod/prime_video?page={}", "ドラマ": "/list-drama/vod/prime_video?page={}" },
+    "Netflix": { "映画": "/list/vod/netflix?page={}", "ドラマ": "/list-drama/vod/netflix?page={}" },
+    "Disney+": { "映画": "/list/vod/disneyplus?page={}", "ドラマ": "/list-drama/vod/disneyplus?page={}" }
+}
+
+# ⭐ 修正: 「スリラー」を除外
 TARGET_GENRES_MAP = {
     "SF": "SF", "アクション": "アクション", "アドベンチャー": "冒険", "冒険": "冒険",
     "アドベンチャー・冒険": "冒険", "クライム": "クライム", "ファミリー": "ファミリー",
     "ファンタジー": "ファンタジー", "アニメ": "アニメ", "アニメーション": "アニメ",
+    "サスペンス": "サスペンス", "ヒューマンドラマ": "ヒューマンドラマ", "ミステリー": "ミステリー",
+    # "スリラー": "スリラー" # 削除
 }
 FINAL_GENRE_BUTTONS = sorted(list(set(TARGET_GENRES_MAP.values())))
-# --- /設定 ---
 
-# HTTPリクエストのヘッダー情報
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
@@ -36,314 +44,332 @@ movie_data_map = {}
 all_processed_genres = set() 
 movie_processed_count = 0 
 synopsis_fetched_count = 0 
+available_content_types = set()
 
 print("スクレイピングを開始します...")
 
 
-# ★★★ あらすじ本文取得ロジック (変更なし) ★★★
 def fetch_synopsis(detail_url, headers):
+    """あらすじを取得する関数"""
     global synopsis_fetched_count
     
     if detail_url == "#" or not detail_url.startswith(BASE_DOMAIN):
         return "あらすじ情報なし"
     
-    print(f"    -> あらすじ取得中: {detail_url}") 
     time.sleep(0.8) 
     
     try:
         response = requests.get(detail_url, headers=headers)
         if response.status_code != 200:
-            print(f"    警告: 詳細ページの取得に失敗しました。ステータスコード: {response.status_code}")
             return "あらすじ情報なし"
             
         detail_soup = BeautifulSoup(response.content, 'html.parser')
         
-        # 1. ★最優先★ JSON-LDからの抽出を試みる
+        # 方法1: p.p-content-detail__synopsis-desc から取得
+        synopsis_elements = detail_soup.select('p.p-content-detail__synopsis-desc')
+        if synopsis_elements:
+            synopsis_text = synopsis_elements[-1].text.strip() 
+            if synopsis_text and len(synopsis_text) > 10:
+                synopsis_fetched_count += 1
+                return synopsis_text
+
+        # 方法4: JSON-LD から取得 
         json_ld_script = detail_soup.find('script', {'type': 'application/ld+json'})
         if json_ld_script and json_ld_script.string:
             try:
                 data = json.loads(json_ld_script.string)
-                
                 if isinstance(data, list):
-                    movie_data = next((item for item in data if isinstance(item, dict) and item.get('@type') == 'Movie'), None)
+                    movie_data = next((item for item in data if isinstance(item, dict) and item.get('@type') in ['Movie', 'TVEpisode', 'TVSeries']), None)
                 else:
                     movie_data = data
                 
-                if isinstance(movie_data, dict) and movie_data.get('@type') == 'Movie' and 'outline' in movie_data:
-                    extracted_synopsis = movie_data['outline'].strip()
-                    if extracted_synopsis and len(extracted_synopsis) > 10:
+                if isinstance(movie_data, dict) and movie_data.get('@type') in ['Movie', 'TVEpisode', 'TVSeries']:
+                    extracted_synopsis = movie_data.get('description') or movie_data.get('outline')
+                    if extracted_synopsis and isinstance(extracted_synopsis, str) and len(extracted_synopsis.strip()) > 10:
                         synopsis_fetched_count += 1
-                        print("    ✅ あらすじをJSON-LD (outline) から取得しました。")
-                        return extracted_synopsis
-
+                        return extracted_synopsis.strip()
             except (json.JSONDecodeError, AttributeError, TypeError, StopIteration):
                 pass
 
+        # 方法2: ドラマ専用 - div.p-drama__synopsis 内のテキスト
+        drama_synopsis_div = detail_soup.select_one('div.p-drama__synopsis')
+        if drama_synopsis_div:
+            for unwanted in drama_synopsis_div.select('button, h3, .p-drama__synopsis-title'):
+                unwanted.decompose()
+            synopsis_text = re.sub(r'\s+', ' ', drama_synopsis_div.get_text(strip=True))
+            if synopsis_text and len(synopsis_text) > 10:
+                synopsis_fetched_count += 1
+                return synopsis_text
 
-        # 2. 標準セレクタでの取得を試みる (フォールバック)
+        # 方法5 (強化版): div#js-content-detail-synopsis 内の p タグを結合 (最終フォールバック)
         synopsis_container = detail_soup.select_one('div#js-content-detail-synopsis')
         if synopsis_container:
-            synopsis_elements = synopsis_container.select('p.p-content-detail__synopsis-desc')
+            synopsis_text = ""
+            for p_tag in synopsis_container.find_all('p', recursive=True):
+                text = p_tag.get_text(strip=True)
+                if text:
+                    synopsis_text += " " + text
             
-            synopsis_text = "あらすじ情報なし"
-            if len(synopsis_elements) >= 2:
-                synopsis_text = synopsis_elements[1].text.strip()
-            elif len(synopsis_elements) == 1:
-                synopsis_text = synopsis_elements[0].text.strip()
-            else:
-                if synopsis_container.find('h3', class_='p-content-detail__synopsis-term'):
-                    synopsis_container.find('h3', class_='p-content-detail__synopsis-term').decompose()
-                if synopsis_container.find('button', class_='p-content-detail-readmore'):
-                    synopsis_container.find('button', class_='p-content-detail-readmore').decompose()
-                
-                temp_text = synopsis_container.text.strip()
-                temp_text = re.sub(r'\s+', ' ', temp_text).strip()
-                if temp_text and len(temp_text) > 10:
-                    synopsis_text = temp_text
-
-            if synopsis_text and synopsis_text != "あらすじ情報なし" and synopsis_text.strip() and len(synopsis_text) > 10:
-                 synopsis_fetched_count += 1 
-                 print("    ✅ あらすじの本文を取得しました (標準セレクタ/フォールバック)。")
-                 return synopsis_text
-
+            if not synopsis_text:
+                for tag in synopsis_container.find_all(['h3', 'button']):
+                    tag.decompose()
+                synopsis_text = synopsis_container.get_text(strip=True)
             
-    except requests.exceptions.RequestException as e:
-        print(f"    エラー: 詳細ページのアクセスで問題が発生しました: {e}")
+            synopsis_text = re.sub(r'\s+', ' ', synopsis_text.strip()).strip()
+
+            if synopsis_text and len(synopsis_text) > 10 and "あらすじ情報なし" not in synopsis_text:
+                synopsis_fetched_count += 1  
+                return synopsis_text
+            
+    except requests.exceptions.RequestException:
+        pass
         
-    print("    ❌ あらすじの本文は取得できませんでした。")
     return "あらすじ情報なし"
-# ★★★ /あらすじ本文取得ロジック ★★★
 
 
-# VODサービスごとにループ (変更なし)
-for vod_name_short, url_suffix in VOD_URLS.items(): 
-    print(f"\n--- {vod_name_short} のデータを収集中 ---")
-    
-    for page in range(1, TOTAL_PAGES + 1):
-        url = urljoin(BASE_DOMAIN, url_suffix.format(page))
-        print(f"  {vod_name_short} {page}ページ目を収集中...: {url}")
+# VODサービスごとにループ
+for vod_name, list_types in VOD_LIST_URLS.items():  
+    for list_type, url_suffix in list_types.items():
         
-        time.sleep(1) 
+        vod_name_short = vod_name
+        synopsis_counter_for_page = 0  
+            
+        print(f"\n{'='*60}")
+        print(f"--- {vod_name} の {list_type} データを収集中 ---")
+        print(f"{'='*60}")
         
-        try:
-            response = requests.get(url, headers=headers)
-            if response.status_code != 200:
-                print(f"  警告: {page}ページ目の取得に失敗しました。ステータスコード: {response.status_code}")
+        # 設定されたページ数分ループ
+        for page in range(1, TOTAL_PAGES + 1):
+            url = urljoin(BASE_DOMAIN, url_suffix.format(page))
+            print(f"\n📄 {vod_name} {list_type} {page}ページ目: {url}")
+            
+            time.sleep(1) 
+            
+            try:
+                response = requests.get(url, headers=headers)
+                if response.status_code != 200:
+                    print(f"  ⚠️ ページ取得失敗。ステータス: {response.status_code}")
+                    continue
+            except requests.exceptions.RequestException as e:
+                print(f"  ❌ アクセスエラー: {e}")
                 continue
-        except requests.exceptions.RequestException as e:
-            print(f"  エラー: {page}ページ目のアクセスで問題が発生しました: {e}")
-            continue
 
-        soup = BeautifulSoup(response.content, 'html.parser')
-        movies = soup.select('div.js-cassette') 
-        
-        if not movies and page == 1:
-             print(f"  【エラー】{vod_name_short}の1ページ目に映画が見つかりませんでした。")
-             break 
-        elif not movies:
-            print(f"  {vod_name_short}のデータは最後まで到達したようです。処理を終了します。")
-            break 
-
-        for movie in movies:
-            if movie_processed_count >= MAX_MOVIES_TO_SCRAPE:
-                print("  💡 処理件数が上限に達したため、スクレイピングを強制終了します。")
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+                comment.extract()
+            
+            movies = soup.select('div.js-cassette')
+            print(f"  📊 取得した要素数: {len(movies)}件\n")
+            
+            if not movies:
+                print(f"  ⚠️ コンテンツが見つかりません")
                 break 
 
-            try:
-                # ... (映画情報抽出ロジックは省略) ...
-                content_cassette = movie.select_one('div.p-content-cassette')
-                if not content_cassette: continue
-                
-                title_element = content_cassette.select_one('.p-content-cassette__title')
-                score_element = content_cassette.select_one('.c-rating__score')
-                if not (title_element and score_element): continue
+            for idx, movie in enumerate(movies):
+                if movie_processed_count >= MAX_MOVIES_TO_SCRAPE:
+                    print("  🛑 処理件数上限に到達")
+                    break 
 
-                title = title_element.text.strip()
-                score_text = score_element.text.strip()
-                try: score = float(score_text)
-                except ValueError: continue
-
-                detail_url = "#"
-                movie_id = None
-                
-                data_clip_str = movie.get('data-clip')
-                if data_clip_str:
-                    try:
-                        cleaned_data_clip_str = data_clip_str.replace("'", '"')
-                        data_clip = json.loads(cleaned_data_clip_str)
-                        movie_id = data_clip.get('movie_id')
-                        if movie_id: detail_url = f"{BASE_DOMAIN}/movies/{movie_id}" 
-                    except (json.JSONDecodeError, Exception): pass
-
-                if not movie_id: continue
-
-                poster_url = None
                 try:
-                    poster_element = content_cassette.select_one('div.p-content-cassette__jacket img') 
-                    if poster_element: poster_url = poster_element.get('data-src') or poster_element.get('src')
-                except Exception: pass
+                    
+                    # 評価スコア
+                    score_element = movie.select_one('.c-rating__score')
+                    score = float(score_element.text.strip()) if score_element else 0.0
 
-                release_date = "上映日：N/A"
-                try:
-                    release_info_div = content_cassette.select_one('.p-content-cassette__other-info-title')
-                    if release_info_div and "上映日：" in release_info_div.text:
-                        next_span = release_info_div.find_next_sibling('span')
-                        if next_span: release_date = f"上映日：{next_span.text.strip()}"
-                except Exception: pass 
-
-                raw_genres = [] 
-                processed_genres = set() 
-                genres_info = "ジャンル：N/A"
-                try:
-                    genre_elements = content_cassette.select('.p-content-cassette__other-info.genres_and_distributor .genres a')
-                    raw_genres = [g.text.strip() for g in genre_elements]
-                    if raw_genres:
-                        for g in raw_genres:
-                            processed_g = TARGET_GENRES_MAP.get(g)
-                            if processed_g: processed_genres.add(processed_g)
+                    # タイトル
+                    title_element = movie.select_one('h3.p-content-cassette__title')
+                    if not title_element:
+                        continue 
+                    
+                    title = title_element.text.strip()
+                    
+                    detail_url = "#"
+                    movie_id = None
+                    
+                    # data-clip からIDとURLを取得
+                    data_clip_str = movie.get('data-clip')
+                    if data_clip_str:
+                        try:
+                            cleaned_data_clip_str = data_clip_str.replace("'", '"').replace('&quot;', '"')
+                            data_clip = json.loads(cleaned_data_clip_str)
                             
-                            unique_raw_genres = list(set(raw_genres))
-                            genres_info = f"ジャンル：{', '.join(unique_raw_genres)}"
+                            drama_series_id = data_clip.get('drama_series_id')
+                            drama_season_id = data_clip.get('drama_season_id')
+                            movie_content_id = data_clip.get('movie_id') or data_clip.get('tv_id')
+                            
+                            if drama_series_id and drama_season_id:
+                                movie_id = f"dramas_{drama_series_id}_{drama_season_id}"
+                                detail_url = f"{BASE_DOMAIN}/dramas/{drama_series_id}/{drama_season_id}"
+                            elif movie_content_id:
+                                content_classes = movie.get('class', [])
+                                content_type_path = 'tv' if ('p-content-cassette--tv' in content_classes or list_type == 'ドラマ') else 'movies'
+                                movie_id = f"{content_type_path}_{movie_content_id}" 
+                                detail_url = f"{BASE_DOMAIN}/{content_type_path}/{movie_content_id}"
+                                
+                        except Exception:
+                            pass
+
+                    if not movie_id: 
+                        continue
+
+                    # ポスターURL
+                    poster_element = movie.select_one('div.p-content-cassette__jacket img, div.c2-poster-m img') 
+                    poster_url = poster_element.get('data-src') if poster_element else None
+                    if not poster_url:
+                        poster_url = poster_element.get('src') if poster_element else None
+
+                    # 公開日
+                    release_date = "公開・初回放送:N/A"
+                    release_info_div = movie.select_one('div.p-content-cassette__other-info')
+                    if release_info_div:
+                        first_span = release_info_div.select_one('span:nth-of-type(1)')
+                        if first_span:
+                            label = release_info_div.select_one('.p-content-cassette__other-info-title')
+                            prefix = label.text.strip() if label else "日付:"
+                            release_date = f"{prefix}{first_span.text.strip()}"
+
+                    # ジャンル取得ロジック
+                    raw_genres = []  
+                    processed_genres = set()  
+                    genres_info = "ジャンル:N/A"
+                    
+                    genre_elements = movie.select('div.p-content-cassette__other-info.genres_and_distributor ul.genres li a')
+                    
+                    if not genre_elements:
+                         genre_elements = movie.select('div.p-content-cassette__genre ul li a')
+                         
+                    if genre_elements:
+                        raw_genres = [g.text.strip() for g in genre_elements]
+                        if raw_genres:
+                            for g in raw_genres:
+                                processed_g = TARGET_GENRES_MAP.get(g)
+                                if processed_g: 
+                                    processed_genres.add(processed_g)
+                            genres_info = f"ジャンル:{', '.join(list(set(raw_genres)))}"
                             all_processed_genres.update(processed_genres)
-                except Exception: pass 
+                        
+                    # あらすじ取得 
+                    synopsis = "あらすじ情報なし"  
+                    if synopsis_counter_for_page < SYNOPSIS_PER_PAGE and detail_url != "#":
+                        synopsis = fetch_synopsis(detail_url, headers)  
+                        if synopsis != "あらすじ情報なし":
+                            synopsis_counter_for_page += 1  
+                        
+                    # データ保存
+                    available_content_types.add(list_type) 
                     
-                # --- あらすじのスクレイピングを実行 ---
-                synopsis = "あらすじ情報なし" 
-                if movie_processed_count < MAX_MOVIES_TO_SCRAPE and detail_url != "#":
-                    synopsis = fetch_synopsis(detail_url, headers) 
+                    if movie_id in movie_data_map:
+                        if vod_name_short not in movie_data_map[movie_id]['vod_sources']:
+                            movie_data_map[movie_id]['vod_sources'].append(vod_name_short)
+                    else:
+                        movie_data_map[movie_id] = {
+                            'タイトル': title,  
+                            '評価': score,  
+                            '画像URL': poster_url,
+                            '公開・初回放送': release_date,  
+                            'ジャンル': genres_info,  
+                            'あらすじ': synopsis,  
+                            'ジャンルリスト': list(processed_genres),  
+                            '詳細URL': detail_url,
+                            'vod_sources': [vod_name_short],
+                            'コンテンツタイプ': list_type 
+                        }
                     
-                # --- /あらすじのスクレイピングを実行 ---
-                
-                # データに追加 
-                if movie_id in movie_data_map:
-                    if vod_name_short not in movie_data_map[movie_id]['vod_sources']:
-                        movie_data_map[movie_id]['vod_sources'].append(vod_name_short)
-                else:
-                    movie_data_map[movie_id] = {
-                        'タイトル': title, 
-                        '評価': score, 
-                        '画像URL': poster_url,
-                        '上映日': release_date,
-                        'ジャンル': genres_info, 
-                        'あらすじ': synopsis, 
-                        'ジャンルリスト': list(processed_genres), 
-                        '詳細URL': detail_url,
-                        'vod_sources': [vod_name_short] 
-                    }
-                
-                movie_processed_count += 1 
+                    movie_processed_count += 1  
 
-            except Exception as e:
-                print(f"    個別の映画処理中にエラー: {e}")
-                pass
+                except Exception as e:
+                    # print(f"    ❌ 処理エラー: {e}")
+                    pass
+                
+            if movie_processed_count >= MAX_MOVIES_TO_SCRAPE: 
+                break
         
-        if movie_processed_count >= MAX_MOVIES_TO_SCRAPE: break
-    if movie_processed_count >= MAX_MOVIES_TO_SCRAPE: break
+        if movie_processed_count >= MAX_MOVIES_TO_SCRAPE:
+             break
+    
+    if movie_processed_count >= MAX_MOVIES_TO_SCRAPE:
+        break
 
 
-# 収集したデータをDataFrameに変換 (変更なし)
+# ============================================
+# データ処理 & HTML生成
+# ============================================
+
 df = pd.DataFrame(list(movie_data_map.values()))
 
-# 最終的な取得ステータスをコンソールに出力
-if synopsis_fetched_count > 0:
-    print(f"\n✅ テストモード（{MAX_MOVIES_TO_SCRAPE}件制限）で、あらすじの本文取得に成功しました。 (取得件数: {synopsis_fetched_count}/{MAX_MOVIES_TO_SCRAPE})")
-else:
-    print(f"\n❌ テストモード（{MAX_MOVIES_TO_SCRAPE}件制限）ですが、あらすじの本文は取得できませんでした。")
-
-# ... (HTML生成と出力は省略) ...
-display_genres = sorted([g for g in FINAL_GENRE_BUTTONS if g in all_processed_genres])
+print(f"\n{'='*60}")
+print(f"✅ 収集完了: {movie_processed_count}件")
+print(f"✅ あらすじ取得成功: {synopsis_fetched_count}件")
+print(f"{'='*60}\n")
 
 if df.empty:
-    print("収集できたデータがありませんでした。")
+    print("❌ データなし")
 else:
     ranking_df = df.sort_values(by='評価', ascending=False).reset_index(drop=True)
     ranking_df.index = ranking_df.index + 1
     ranking_df.index.name = '順位'
     
-    print("\nHTMLファイルを生成しています...")
+    print("📊 取得データサンプル:")
+    print(ranking_df[['タイトル', '評価', 'コンテンツタイプ', 'ジャンル']].head())
     
-    # 🌟 追加: 現在の日付をJinja2テンプレートで利用できるようにする
+    print("\n🔨 HTMLファイル生成中...")
+    
     current_date = datetime.now().strftime("%Y.%m.%d")
+    # FINAL_GENRE_BUTTONSは既に「スリラー」を除外した状態で定義されている
+    display_genres = sorted([g for g in FINAL_GENRE_BUTTONS if g in all_processed_genres])
+    available_vods = sorted(list(set(sum([d['vod_sources'] for d in movie_data_map.values()], []))))
+    display_content_types = sorted(list(available_content_types))
     
     html_template = Template("""
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Filmarks VODランキング (Prime Video & Netflix)</title>
-    
-    <meta name="viewport" content="width=1040, initial-scale=1">
+    <title>Filmarks VODランキング(映画・ドラマ)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        /* CSS修正 */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
         h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+        .update-time { text-align: right; font-size: 0.85em; color: #777; margin-top: -10px; margin-bottom: 15px; padding-right: 10px; }
+        .update-time span { font-weight: bold; color: #555; margin-left: 5px; }
+        .filter-section { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 15px; }
+        .filter-title { font-size: 0.9em; font-weight: bold; color: #555; margin-bottom: 5px; }
+        .filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+        .genre-button, .vod-button, .type-button { background-color: #f0f0f0; color: #555; border: 1px solid #ccc; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; cursor: pointer; transition: all 0.2s; outline: none; user-select: none; }
+        
+        /* VODボタンの色 */
+        .vod-button[data-vod="Amazon"] { background-color: #f0f8ff; border-color: #0088cc; color: #0088cc; }
+        .vod-button[data-vod="Netflix"] { background-color: #fff0f1; border-color: #e50914; color: #e50914; }
+        .vod-button[data-vod="Disney+"] { background-color: #f1f3ff; border-color: #113ccf; color: #113ccf; }
 
-        /* 🌟 追加: 更新日時のスタイル */
-        .update-time { 
-            text-align: right; 
-            font-size: 0.85em; 
-            color: #777; 
-            margin-top: -10px; /* H1との間を少し詰める */
-            margin-bottom: 15px;
-            padding-right: 10px;
-        }
-        .update-time span {
-            font-weight: bold;
-            color: #555;
-            margin-left: 5px;
-        }
-        
-        .genre-filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 30px 0; border-bottom: 1px solid #ddd; margin-bottom: 30px; }
-        .genre-button { background-color: #f0f0f0; color: #555; border: 1px solid #ccc; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; cursor: pointer; transition: background-color 0.2s, color 0.2s, border-color 0.2s; outline: none; user-select: none; }
+        /* コンテンツタイプの色 */
+        .type-button[data-type="映画"] { background-color: #f7f7e0; border-color: #a0a000; color: #a0a000; }
+        .type-button[data-type="ドラマ"] { background-color: #e0f7f7; border-color: #008080; color: #008080; }
+
+        /* アクティブなボタン */
         .genre-button.active { background-color: #0088cc; color: white; border-color: #0088cc; }
+        .vod-button.active[data-vod="Amazon"] { background-color: #0088cc; color: white; }
+        .vod-button.active[data-vod="Netflix"] { background-color: #e50914; color: white; }
+        .vod-button.active[data-vod="Disney+"] { background-color: #113ccf; color: white; }
+        .type-button.active[data-type="映画"] { background-color: #a0a000; color: white; }
+        .type-button.active[data-type="ドラマ"] { background-color: #008080; color: white; }
         
-        /* ★修正点1: movie-item 全体にホバー効果を適用 */
-        .movie-item { 
-            border-left: 5px solid transparent; 
-            transition: all 0.3s ease-in-out; 
-            display: flex; 
-            align-items: stretch; 
-            padding: 15px 0; 
-            border-bottom: 1px dashed #eee; 
-            position: relative; 
-            cursor: pointer; /* マウスカーソルをポインターに変更 */
-        }
+        .movie-item { border-left: 5px solid transparent; transition: all 0.3s; display: flex; align-items: stretch; padding: 15px 0; border-bottom: 1px dashed #eee; position: relative; }
         .movie-item.hidden { display: none; }
         .rating-highlight { background-color: #fff9e6; border-left: 5px solid #ffcc33; }
-        
-        /* ★修正点2: ホバー時に背景色を適用 */
-        .movie-item:hover {
-             background-color: #ffefd1; /* 薄いオレンジ */
-        }
-        
-        .rank-area { width: 90px; flex-shrink: 0; padding-right: 15px; padding-left: 10px; display: flex; flex-direction: row; flex-wrap: nowrap; align-content: stretch; justify-content: center; align-items: center; }
+        .movie-item:hover { background-color: #fcf9f0; }
+        .rank-area { width: 90px; flex-shrink: 0; padding-right: 15px; padding-left: 10px; display: flex; justify-content: center; align-items: center; }
         .rank { font-size: 3.5em; font-weight: bold; text-align: center; color: #aaa; line-height: 1; }
         .rank.top3 { color: #ffbf00; }
         .rank.top10 { color: #0088cc; }
-        
-        /* ★修正点3: content-link-wrap のホバー効果を削除し、ホバー時タイトル色変更を追加 */
-        .content-link-wrap { 
-            display: flex; 
-            flex-grow: 1; 
-            align-items: flex-start; /* 縦方向の整列を修正 */
-            text-decoration: none; 
-            color: inherit; 
-            transition: color 0.3s; /* タイトルの色変更用 */
-            padding: 15px 0; 
-            margin: -15px 0; /* movie-item のpaddingを相殺し、クリック領域を広げる */
-            flex-wrap: wrap; /* あらすじを次の行に配置するために追加 */
-        }
-        .movie-item:hover .title { color: #0088cc; text-decoration: underline; } /* ホバー時タイトルを青くする */
-
-        /* ★CSS変更点1: padding-top: 9px; を追加 */
-        .poster { width: 100px; height: auto; margin-right: 20px; flex-shrink: 0; flex-grow: 0; display: flex; padding-top: 9px;}
+        .content-link-wrap { display: flex; flex-grow: 1; align-items: flex-start; text-decoration: none; color: inherit; transition: color 0.3s; padding: 15px 0; margin: -15px 0; }
+        .content-link-wrap:hover .title { color: #0088cc; text-decoration: underline; } 
+        .poster { width: 100px; height: auto; margin-right: 20px; flex-shrink: 0; display: flex; padding-top: 9px;}
         .poster img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
         .info { flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-right: 15px; min-width: 250px; }
-        .main-info { display: flex; flex-direction: column; flex-grow: 1; justify-content: flex-start; }
-        .title-and-badges { display: flex; align-items: center; margin-bottom: 5px; }
-        .title { font-size: 1.2em; font-weight: 600; color: #333; margin-right: 10px; }
-        
+        .title { font-size: 1.2em; font-weight: 600; color: #333; margin-bottom: 5px; }
         .release-date, .genre-info { font-size: 0.85em; color: #777; margin-bottom: 5px; line-height: 1.4; }
         .score-block { display: flex; align-items: center; margin-bottom: 5px; }
         .star-rating { display: inline-flex; align-items: center; font-size: 1.3em; margin-right: 8px; position: relative; }
@@ -354,60 +380,45 @@ else:
         .vod-badge { font-size: 0.75em; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: none; border: 1px solid; white-space: nowrap; }
         .vod-badge.Amazon { color: #0088cc; border-color: #0088cc; }
         .vod-badge.Netflix { color: #e50914; border-color: #e50914; }
-        
-        /* ★CSS変更点2: あらすじの調整 - margin-top: 10px; を削除 */
-        .synopsis-wrap { 
-            flex-basis: 100%; /* 親要素(content-link-wrap)の幅いっぱいを使用 */
-            /* margin-top: 10px; ← 削除済み */
-            padding-left: 120px; /* ポスターの幅(100px) + マージン(20px) に合わせて左に余白を持たせる */
-            font-size: 0.85em; 
-            color: #555; 
-            line-height: 1.5; 
-            z-index: 5; 
-            display: flex; 
-            flex-direction: column; 
-        }
-        .synopsis-content { position: relative; z-index: 2; }
-        .synopsis-text { overflow: hidden; transition: max-height 0.5s ease-in-out, padding 0.2s; max-height: 0; padding: 0; display: block; }
-        .synopsis-text.expanded { padding: 10px 0; }
+        .vod-badge.Disney\\+ { color: #113ccf; border-color: #113ccf; }
+        .synopsis-area { flex-basis: 100%; font-size: 0.85em; color: #555; line-height: 1.5; display: flex; flex-direction: column; padding-top: 5px; }
+        .synopsis-toggle-button { background: none; border: none; color: orange; cursor: pointer; padding: 5px 0; font-size: 0.9em; font-weight: bold; text-align: left; }
+        .synopsis-text { overflow: hidden; transition: max-height 0.5s ease-in-out; max-height: 0; padding: 0; margin-top: 0; }
+        .synopsis-text.expanded { padding: 10px 0; max-height: 1000px !important; }
         .synopsis-text p { margin: 0; }
-        .synopsis-toggle-button { background: none; border: none; color: orange; cursor: pointer; padding: 5px 0; font-size: 0.9em; display: block; font-weight: bold; text-align: left; position: relative; z-index: 10; }
-        
-        @media (max-width: 600px) {
-            body { padding: 5px; }
-            .container { padding: 10px; }
-            h1 { font-size: 1.4em; margin-bottom: 15px; }
-            .update-time { margin-top: -5px; margin-bottom: 10px; text-align: center; }
-            .movie-item { flex-direction: column; align-items: flex-start; padding: 10px 0; position: relative; }
-            .rank-area { width: 100%; padding: 0 10px; margin-bottom: 5px; justify-content: flex-start; align-items: flex-start; }
-            .rank { font-size: 2.5em; align-self: flex-start; padding-left: 0; }
-            
-            .content-link-wrap { width: 100%; padding: 0 10px; flex-wrap: wrap; align-items: flex-start; margin: 0; }
-            .poster { width: 80px; height: auto; margin-right: 10px; padding-top: 0; /* モバイルではリセット */ }
-            .info { padding-right: 0; min-width: 0; flex-basis: calc(100% - 90px); }
-            .title { font-size: 1.0em; }
-            .release-date, .genre-info { font-size: 0.75em; margin-bottom: 2px; line-height: 1.2; }
-            .score { font-size: 1.1em; }
-            
-            /* スマホ表示でのあらすじ調整 */
-            .synopsis-wrap { width: 100%; flex-basis: 100%; margin-top: 5px; padding: 0 10px; } /* 余分なpaddingを削除し、モバイルでの左右のpaddingを合わせる */
-        }
+        .movie-emoji { margin-right: 5px; } /* 映画絵文字用のスペース調整 */
     </style>
 </head>
 <body>
     <div class="container">
+        <h1>VOD 統合ランキング(映画・ドラマ)</h1>
+        <div class="update-time">&#128337; 最終更新日: <span>{{ current_date }}</span></div>
         
-        <h1>Prime Video & Netflix 統合ランキング</h1>
-        
-        {# 🌟 追加: 更新日時の表示 #}
-        <div class="update-time" id="js-update-time">
-            &#128337; <span>{{ current_date }}</span>
+        <div class="filter-section content-type-filters">
+            <div class="filter-title">コンテンツタイプ:</div>
+            <div class="filter-buttons">
+                {% for type in display_content_types %}
+                <button class="type-button" data-type="{{ type }}">{{ type }}</button>
+                {% endfor %}
+            </div>
         </div>
         
-        <div class="genre-filters">
-            {% for genre in display_genres %}
-            <button class="genre-button" data-genre="{{ genre }}">{{ genre }}</button>
-            {% endfor %}
+        <div class="filter-section genre-filters">
+            <div class="filter-title">ジャンル:</div>
+            <div class="filter-buttons">
+                {% for genre in display_genres %}
+                <button class="genre-button" data-genre="{{ genre }}">{{ genre }}</button>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="filter-section vod-filters" style="border-bottom: none; margin-bottom: 30px;">
+            <div class="filter-title">VODサービス:</div>
+            <div class="filter-buttons">
+                {% for vod in available_vods %}
+                <button class="vod-button" data-vod="{{ vod }}">{{ vod }}</button>
+                {% endfor %}
+            </div>
         </div>
         
         {% for index, row in data.iterrows() %}
@@ -416,30 +427,29 @@ else:
         {% set score_percent = (score / 5.0 * 100) %}
         {% set is_highlight = score >= 4.0 %}
         {% set rank_class = 'top3' if rank <= 3 else ('top10' if rank <= 10 else '') %}
-        {# あらすじの有無判定 #}
         {% set synopsis_content = row['あらすじ'] | default('') | trim %}
-        {% set has_synopsis = synopsis_content is not none and synopsis_content != "あらすじ情報なし" and synopsis_content | length > 0 %}
+        {% set has_synopsis = synopsis_content and synopsis_content != "あらすじ情報なし" and synopsis_content | length > 0 %}
         
-        <div class="movie-item {% if is_highlight %}rating-highlight{% endif %}" data-genres="{{ row['ジャンルリスト'] | join(',') }}">
+        <div class="movie-item {% if is_highlight %}rating-highlight{% endif %}" 
+             data-genres="{{ row['ジャンルリスト'] | join(',') }}"
+             data-vods="{{ row['vod_sources'] | join(',') }}"
+             data-type="{{ row['コンテンツタイプ'] }}">
             
             <div class="rank-area">
                 <div class="rank {{ rank_class }}">{{ rank }}</div>
             </div>
             
-            {# ★ここから a タグを開始。あらすじを<a>タグの中に含める構造に変更 #}
             {% if row['詳細URL'] != '#' %}
             <a href="{{ row['詳細URL'] }}" target="_blank" class="content-link-wrap">
             {% endif %}
-
                 <div class="poster">
                     {% if row['画像URL'] %}
-                        <img src="{{ row['画像URL'] }}" alt="{{ row['タイトル'] }} ポスター">
+                    <img src="{{ row['画像URL'] }}" alt="{{ row['タイトル'] }}">
                     {% else %}
-                    <div style="width: 100%; height: 100%; background: #ccc; display: flex; align-items: center; justify-content: center; font-size: 0.8em; text-align: center;">No Image</div>
+                    <div style="width:100%;height:100%;background:#ccc;display:flex;align-items:center;justify-content:center;font-size:0.8em;">No Image</div>
                     {% endif %}
                 </div>
                 <div class="info">
-                    
                     <div class="score-block">
                         <div class="star-rating">
                             <div class="stars-outer">★★★★★</div>
@@ -447,129 +457,102 @@ else:
                         </div>
                         <div class="score-text">{{ score | round(1) }}</div>
                     </div>
-
-                    <div class="main-info">
-                        <div>
-                            <div class="title-and-badges">
-                                <div class="title">
-                                    {{ row['タイトル'] }}
-                                </div>
-                            </div>
-                            <div class="genre-info">{{ row['ジャンル'] }}</div>
-                            <div class="release-date">{{ row['上映日'] }}</div>
-                        </div>
-                        
-                        {# VODバッジ #}
-                        <div class="vod-badges">
-                            {% for vod in row['vod_sources'] %}
-                            <span class="vod-badge {{ vod }}">{{ vod }}</span>
-                            {% endfor %}
-                        </div>
-                        
+                    <div class="title">
+                        {# ⭐ 修正: 映画の場合のみ絵文字を追加、ドラマの場合は何も追加しない #}
+                        {% if row['コンテンツタイプ'] == '映画' %}
+                        <span class="movie-emoji">🎬</span> 
+                        {% endif %}
+                        {{ row['タイトル'] }}
                     </div>
-                    
-                </div>
-            
-            {# あらすじブロックをVODバッジの直後、aタグ内に配置 #}
-            {% if has_synopsis %}
-            <div class="synopsis-wrap">
-                <div class="synopsis-content">
-                    {# トグルボタンを先に配置（CSSで制御するため） #}
-                    <button class="synopsis-toggle-button js-toggle-synopsis" data-expanded="false">
-                        あらすじを見る▼
-                    </button>
-                    <div class="synopsis-text js-synopsis-full" >
-                        <p>{{ synopsis_content | e }}</p> 
+                    <div class="genre-info">{{ row['ジャンル'] }}</div>
+                    <div class="release-date">{{ row['公開・初回放送'] }}</div>
+                    <div class="vod-badges">
+                        {% for vod in row['vod_sources'] %}
+                        {% set badge_class = 'Disney\\+' if vod == 'Disney+' else vod %}
+                        <span class="vod-badge {{ badge_class }}">{{ vod }}</span>
+                        {% endfor %}
                     </div>
+                    {% if has_synopsis %}
+                    <div class="synopsis-area">
+                        <button class="synopsis-toggle-button js-toggle-synopsis" data-expanded="false">あらすじを見る▼</button>
+                        <div class="synopsis-text js-synopsis-full">
+                            <p>{{ synopsis_content | e }}</p> 
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-            </div>
-            {% endif %}
-            
-            {# aタグを終了 #}
             {% if row['詳細URL'] != '#' %}
             </a>
             {% endif %}
-
         </div>
         {% endfor %}
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // ジャンルフィルタのロジック (変更なし)
-            const filterButtons = document.querySelectorAll('.genre-button');
             const movieItems = document.querySelectorAll('.movie-item');
 
-            filterButtons.forEach(button => {
+            function applyFilters() {
+                const activeGenres = Array.from(document.querySelectorAll('.genre-button.active')).map(btn => btn.getAttribute('data-genre'));
+                const activeVods = Array.from(document.querySelectorAll('.vod-button.active')).map(btn => btn.getAttribute('data-vod'));
+                const activeTypes = Array.from(document.querySelectorAll('.type-button.active')).map(btn => btn.getAttribute('data-type'));
+
+                movieItems.forEach(item => {
+                    const movieGenres = (item.getAttribute('data-genres') || '').split(',');
+                    const movieVods = (item.getAttribute('data-vods') || '').split(',');
+                    const movieType = item.getAttribute('data-type');
+                    
+                    const showByGenre = activeGenres.length === 0 || activeGenres.some(g => movieGenres.includes(g));
+                    const showByVod = activeVods.length === 0 || activeVods.some(v => movieVods.includes(v));
+                    const showByType = activeTypes.length === 0 || activeTypes.includes(movieType);
+                    
+                    item.classList.toggle('hidden', !(showByGenre && showByVod && showByType));
+                });
+            }
+
+            document.querySelectorAll('.genre-button').forEach(button => {
                 button.addEventListener('click', function() {
                     this.classList.toggle('active');
-
-                    const activeButtons = document.querySelectorAll('.genre-button.active');
-                    const selectedGenres = Array.from(activeButtons).map(btn => btn.getAttribute('data-genre'));
-
-                    if (selectedGenres.length === 0) {
-                        movieItems.forEach(item => {
-                            item.classList.remove('hidden');
-                        });
-                    } else {
-                        movieItems.forEach(item => {
-                            const movieGenresString = item.getAttribute('data-genres');
-                            const movieGenres = movieGenresString ? movieGenresString.split(',') : [];
-                            
-                            const shouldShow = selectedGenres.some(selectedGenre => 
-                                movieGenres.includes(selectedGenre)
-                            );
-
-                            if (shouldShow) {
-                                item.classList.remove('hidden');
-                            } else {
-                                item.classList.add('hidden');
-                            }
-                        });
-                    }
+                    applyFilters();
                 });
             });
 
-            // あらすじトグルのロジック (変更なし)
+            document.querySelectorAll('.vod-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    applyFilters();
+                });
+            });
+
+            document.querySelectorAll('.type-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    applyFilters();
+                });
+            });
+
             document.querySelectorAll('.js-toggle-synopsis').forEach(button => {
-                const movieItem = button.closest('.movie-item');
-                if (!movieItem) return;
-
-                const full = movieItem.querySelector('.js-synopsis-full');
-
-                button.setAttribute('data-expanded', 'false');
+                const synopsisArea = button.closest('.synopsis-area');
+                if (!synopsisArea) return;
+                const full = synopsisArea.querySelector('.js-synopsis-full');
+                full.style.maxHeight = '0px';
 
                 button.addEventListener('click', function(event) {
                     event.preventDefault(); 
                     event.stopPropagation(); 
-                    
                     const isExpanded = this.getAttribute('data-expanded') === 'true';
                     
                     if (!isExpanded) {
-                        // 展開
-                        full.style.maxHeight = 'none';
-                        const scrollHeight = full.scrollHeight; 
-                        
-                        full.style.maxHeight = '0px'; 
-                        
-                        setTimeout(() => {
-                            full.style.maxHeight = (scrollHeight + 20) + 'px'; 
-                            full.classList.add('expanded'); 
-                        }, 10); 
-
+                        full.classList.add('expanded');
+                        full.style.maxHeight = full.scrollHeight + 'px'; 
                         this.textContent = '一部を隠す▲';
                         this.setAttribute('data-expanded', 'true');
-
                     } else {
-                        // 折りたたみ
-
                         full.style.maxHeight = full.scrollHeight + 'px'; 
-                        
-                        full.classList.remove('expanded'); 
                         setTimeout(() => {
                             full.style.maxHeight = '0px';
+                            full.classList.remove('expanded'); 
                         }, 10);
-                        
                         this.textContent = 'あらすじを見る▼';
                         this.setAttribute('data-expanded', 'false');
                     }
@@ -581,15 +564,18 @@ else:
 </html>
 """)
 
-    # データをHTMLテンプレートに渡してレンダリング
-    html_output = html_template.render(data=ranking_df, display_genres=display_genres, current_date=current_date)
+    html_output = html_template.render(
+        data=ranking_df,  
+        display_genres=display_genres,  
+        current_date=current_date,  
+        available_vods=available_vods,
+        display_content_types=display_content_types 
+    )
 
-    # HTMLファイルを保存
-    html_file_path = 'index.html' 
+    html_file_path = 'index.html'  
     try:
         with open(html_file_path, 'w', encoding='utf-8') as f:
             f.write(html_output)
-        print(f"\n✨ 更新日時の表示を追加し、CSSの微調整を適用しました。")
-        print(f"ウェブページが '{html_file_path}' に保存されました。")
+        print(f"\n✅ '{html_file_path}' に保存完了!")
     except Exception as e:
-        print(f"\nHTMLファイルの保存に失敗しました: {e}")
+        print(f"\n❌ HTML保存失敗: {e}")
