@@ -1,4 +1,4 @@
-# 【最終版: 映画/ドラマ絵文字調整 + ジャンルフィルター修正】
+# 【最終版: 映画/ドラマ絵文字調整 + ジャンルフィルター修正 + モバイルCSS対応 + HTML構造再修正】
 import requests
 from bs4 import BeautifulSoup, Comment 
 import pandas as pd
@@ -14,9 +14,9 @@ import traceback
 sys.stdout.reconfigure(encoding='utf-8') 
 
 # --- 設定 ---
-MAX_MOVIES_TO_SCRAPE = 20000  # 取得上限件数
+MAX_MOVIES_TO_SCRAPE = 5000  # 取得上限件数
 TOTAL_PAGES = 10          # 取得ページ数
-SYNOPSIS_PER_PAGE = 100   # ページあたりのあらすじ取得制限を解除
+SYNOPSIS_PER_PAGE = 500   # ページあたりのあらすじ取得制限を解除
 BASE_DOMAIN = "https://filmarks.com" 
 
 # 全てのVODとリストタイプを対象
@@ -26,13 +26,12 @@ VOD_LIST_URLS = {
     "Disney+": { "映画": "/list/vod/disneyplus?page={}", "ドラマ": "/list-drama/vod/disneyplus?page={}" }
 }
 
-# ⭐ 修正: 「スリラー」を除外
+# 「スリラー」を除外
 TARGET_GENRES_MAP = {
     "SF": "SF", "アクション": "アクション", "アドベンチャー": "冒険", "冒険": "冒険",
     "アドベンチャー・冒険": "冒険", "クライム": "クライム", "ファミリー": "ファミリー",
     "ファンタジー": "ファンタジー", "アニメ": "アニメ", "アニメーション": "アニメ",
     "サスペンス": "サスペンス", "ヒューマンドラマ": "ヒューマンドラマ", "ミステリー": "ミステリー",
-    # "スリラー": "スリラー" # 削除
 }
 FINAL_GENRE_BUTTONS = sorted(list(set(TARGET_GENRES_MAP.values())))
 
@@ -279,7 +278,6 @@ for vod_name, list_types in VOD_LIST_URLS.items():
                     movie_processed_count += 1  
 
                 except Exception as e:
-                    # print(f"    ❌ 処理エラー: {e}")
                     pass
                 
             if movie_processed_count >= MAX_MOVIES_TO_SCRAPE: 
@@ -316,7 +314,6 @@ else:
     print("\n🔨 HTMLファイル生成中...")
     
     current_date = datetime.now().strftime("%Y.%m.%d")
-    # FINAL_GENRE_BUTTONSは既に「スリラー」を除外した状態で定義されている
     display_genres = sorted([g for g in FINAL_GENRE_BUTTONS if g in all_processed_genres])
     available_vods = sorted(list(set(sum([d['vod_sources'] for d in movie_data_map.values()], []))))
     display_content_types = sorted(list(available_content_types))
@@ -329,64 +326,141 @@ else:
     <title>Filmarks VODランキング(映画・ドラマ)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-        h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
-        .update-time { text-align: right; font-size: 0.85em; color: #777; margin-top: -10px; margin-bottom: 15px; padding-right: 10px; }
-        .update-time span { font-weight: bold; color: #555; margin-left: 5px; }
-        .filter-section { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 15px; }
-        .filter-title { font-size: 0.9em; font-weight: bold; color: #555; margin-bottom: 5px; }
-        .filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-        .genre-button, .vod-button, .type-button { background-color: #f0f0f0; color: #555; border: 1px solid #ccc; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; cursor: pointer; transition: all 0.2s; outline: none; user-select: none; }
-        
-        /* VODボタンの色 */
-        .vod-button[data-vod="Amazon"] { background-color: #f0f8ff; border-color: #0088cc; color: #0088cc; }
-        .vod-button[data-vod="Netflix"] { background-color: #fff0f1; border-color: #e50914; color: #e50914; }
-        .vod-button[data-vod="Disney+"] { background-color: #f1f3ff; border-color: #113ccf; color: #113ccf; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+    h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+    .update-time { text-align: right; font-size: 0.85em; color: #777; margin-top: -10px; margin-bottom: 15px; padding-right: 10px; }
+    .update-time span { font-weight: bold; color: #555; margin-left: 5px; }
+    .filter-section { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 15px; }
+    .filter-title { font-size: 0.9em; font-weight: bold; color: #555; margin-bottom: 5px; }
+    .filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .genre-button, .vod-button, .type-button { background-color: #f0f0f0; color: #555; border: 1px solid #ccc; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; cursor: pointer; transition: all 0.2s; outline: none; user-select: none; }
+   
+    /* VODボタンの色 */
+    .vod-button[data-vod="Amazon"] { background-color: #f0f8ff; border-color: #0088cc; color: #0088cc; }
+    .vod-button[data-vod="Netflix"] { background-color: #fff0f1; border-color: #e50914; color: #e50914; }
+    .vod-button[data-vod="Disney+"] { background-color: #f1f3ff; border-color: #113ccf; color: #113ccf; }
 
-        /* コンテンツタイプの色 */
-        .type-button[data-type="映画"] { background-color: #f7f7e0; border-color: #a0a000; color: #a0a000; }
-        .type-button[data-type="ドラマ"] { background-color: #e0f7f7; border-color: #008080; color: #008080; }
+    /* コンテンツタイプの色 */
+    .type-button[data-type="映画"] { background-color: #f7f7e0; border-color: #a0a000; color: #a0a000; }
+    .type-button[data-type="ドラマ"] { background-color: #e0f7f7; border-color: #008080; color: #008080; }
 
-        /* アクティブなボタン */
-        .genre-button.active { background-color: #0088cc; color: white; border-color: #0088cc; }
-        .vod-button.active[data-vod="Amazon"] { background-color: #0088cc; color: white; }
-        .vod-button.active[data-vod="Netflix"] { background-color: #e50914; color: white; }
-        .vod-button.active[data-vod="Disney+"] { background-color: #113ccf; color: white; }
-        .type-button.active[data-type="映画"] { background-color: #a0a000; color: white; }
-        .type-button.active[data-type="ドラマ"] { background-color: #008080; color: white; }
-        
-        .movie-item { border-left: 5px solid transparent; transition: all 0.3s; display: flex; align-items: stretch; padding: 15px 0; border-bottom: 1px dashed #eee; position: relative; }
-        .movie-item.hidden { display: none; }
-        .rating-highlight { background-color: #fff9e6; border-left: 5px solid #ffcc33; }
-        .movie-item:hover { background-color: #fcf9f0; }
-        .rank-area { width: 90px; flex-shrink: 0; padding-right: 15px; padding-left: 10px; display: flex; justify-content: center; align-items: center; }
-        .rank { font-size: 3.5em; font-weight: bold; text-align: center; color: #aaa; line-height: 1; }
-        .rank.top3 { color: #ffbf00; }
-        .rank.top10 { color: #0088cc; }
-        .content-link-wrap { display: flex; flex-grow: 1; align-items: flex-start; text-decoration: none; color: inherit; transition: color 0.3s; padding: 15px 0; margin: -15px 0; }
-        .content-link-wrap:hover .title { color: #0088cc; text-decoration: underline; } 
-        .poster { width: 100px; height: auto; margin-right: 20px; flex-shrink: 0; display: flex; padding-top: 9px;}
-        .poster img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
-        .info { flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-right: 15px; min-width: 250px; }
-        .title { font-size: 1.2em; font-weight: 600; color: #333; margin-bottom: 5px; }
-        .release-date, .genre-info { font-size: 0.85em; color: #777; margin-bottom: 5px; line-height: 1.4; }
-        .score-block { display: flex; align-items: center; margin-bottom: 5px; }
-        .star-rating { display: inline-flex; align-items: center; font-size: 1.3em; margin-right: 8px; position: relative; }
-        .stars-outer { position: relative; display: inline-flex; color: #d9d1b9; white-space: nowrap; }
-        .stars-inner { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; width: 0; color: orange; }
-        .score-text { font-size: 1.5em; font-weight: bold; color: orange; }
-        .vod-badges { display: flex; gap: 5px; margin-top: 5px; margin-bottom: 5px; }
-        .vod-badge { font-size: 0.75em; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: none; border: 1px solid; white-space: nowrap; }
-        .vod-badge.Amazon { color: #0088cc; border-color: #0088cc; }
-        .vod-badge.Netflix { color: #e50914; border-color: #e50914; }
-        .vod-badge.Disney\\+ { color: #113ccf; border-color: #113ccf; }
-        .synopsis-area { flex-basis: 100%; font-size: 0.85em; color: #555; line-height: 1.5; display: flex; flex-direction: column; padding-top: 5px; }
-        .synopsis-toggle-button { background: none; border: none; color: orange; cursor: pointer; padding: 5px 0; font-size: 0.9em; font-weight: bold; text-align: left; }
-        .synopsis-text { overflow: hidden; transition: max-height 0.5s ease-in-out; max-height: 0; padding: 0; margin-top: 0; }
-        .synopsis-text.expanded { padding: 10px 0; max-height: 1000px !important; }
-        .synopsis-text p { margin: 0; }
-        .movie-emoji { margin-right: 5px; } /* 映画絵文字用のスペース調整 */
+    /* アクティブなボタン */
+    .genre-button.active { background-color: #0088cc; color: white; border-color: #0088cc; }
+    .vod-button.active[data-vod="Amazon"] { background-color: #0088cc; color: white; }
+    .vod-button.active[data-vod="Netflix"] { background-color: #e50914; color: white; }
+    .vod-button.active[data-vod="Disney+"] { background-color: #113ccf; color: white; }
+    .type-button.active[data-type="映画"] { background-color: #a0a000; color: white; }
+    .type-button.active[data-type="ドラマ"] { background-color: #008080; color: white; }
+   
+    .movie-item { border-left: 5px solid transparent; transition: all 0.3s; display: flex; align-items: stretch; padding: 15px 0; border-bottom: 1px dashed #eee; position: relative; }
+    .movie-item.hidden { display: none; }
+    .rating-highlight { background-color: #fff9e6; border-left: 5px solid #ffcc33; }
+    .movie-item:hover { background-color: #fcf9f0; }
+    .rank-area { width: 90px; flex-shrink: 0; padding-right: 15px; padding-left: 10px; display: flex; justify-content: center; align-items: center; }
+    .rank { font-size: 3.5em; font-weight: bold; text-align: center; color: #aaa; line-height: 1; }
+    .rank.top3 { color: #ffbf00; }
+    .rank.top10 { color: #0088cc; }
+    .content-link-wrap { display: flex; flex-grow: 1; align-items: flex-start; text-decoration: none; color: inherit; transition: color 0.3s; padding: 15px 0; margin: -15px 0; }
+    .content-link-wrap:hover .title { color: #0088cc; text-decoration: underline; }
+    .poster { width: 100px; height: auto; margin-right: 20px; flex-shrink: 0; display: flex; padding-top: 9px;}
+    .poster img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
+    .info { flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-right: 15px; min-width: 250px; }
+    .title { font-size: 1.2em; font-weight: 600; color: #333; margin-bottom: 5px; }
+    .release-date, .genre-info { font-size: 0.85em; color: #777; margin-bottom: 5px; line-height: 1.4; }
+    .score-block { display: flex; align-items: center; margin-bottom: 5px; }
+    .star-rating { display: inline-flex; align-items: center; font-size: 1.3em; margin-right: 8px; position: relative; }
+    .stars-outer { position: relative; display: inline-flex; color: #d9d1b9; white-space: nowrap; }
+    .stars-inner { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; width: 0; color: orange; }
+    .score-text { font-size: 1.5em; font-weight: bold; color: orange; }
+    .vod-badges { display: flex; gap: 5px; margin-top: 5px; margin-bottom: 5px; }
+    .vod-badge { font-size: 0.75em; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: none; border: 1px solid; white-space: nowrap; }
+    .vod-badge.Amazon { color: #0088cc; border-color: #0088cc; }
+    .vod-badge.Netflix { color: #e50914; border-color: #e50914; }
+    .vod-badge.Disney\\+ { color: #113ccf; border-color: #113ccf; }
+    .synopsis-area { flex-basis: 100%; font-size: 0.85em; color: #555; line-height: 1.5; display: flex; flex-direction: column; padding-top: 5px; }
+    .synopsis-toggle-button { background: none; border: none; color: orange; cursor: pointer; padding: 5px 0; font-size: 0.9em; font-weight: bold; text-align: left; }
+    .synopsis-text { overflow: hidden; transition: max-height 0.5s ease-in-out; max-height: 0; padding: 0; margin-top: 0; }
+    .synopsis-text.expanded { padding: 10px 0; max-height: 1000px !important; }
+    .synopsis-text p { margin: 0; }
+    .movie-emoji { margin-right: 5px; } /* 映画絵文字用のスペース調整 */
+
+        /* --- 追加CSS開始 --- */
+        .content-area-mobile-wrap {
+            display: flex; /* これを追加 */
+        }
+        /* --- 追加CSS終了 --- */
+   
+    /* ============== iPhone SE2 (375px) 対応 CSSの復活 ============== */
+    @media (max-width: 500px) {
+      body { padding: 10px; }
+      .container { padding: 15px; }
+     
+      .filter-buttons { gap: 6px; }
+      .genre-button, .vod-button, .type-button { padding: 4px 10px; font-size: 0.85em; }
+     
+      .movie-item {
+        flex-direction: column; /* 縦に積み重ねる */
+        align-items: flex-start;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .content-link-wrap {
+        /* flex-direction: column; */
+        padding: 0 14px;
+        margin: 0;
+      }
+     
+      .rank-area {
+        width: 100%;
+        height: 40px;
+        padding: 0;
+        justify-content: flex-start; /* 順位を左に寄せる */
+        margin-bottom: 10px;
+      }
+      .rank {
+        font-size: 2.5em; /* 順位を少し小さく */
+        width: 50px;
+      }
+     
+      .poster {
+        width: 80px; /* ポスターを小さく */
+        height: auto;
+        margin-right: 15px;
+        padding-top: 0;
+      }
+     
+      .info {
+        min-width: unset;
+        padding-right: 0;
+        margin-top: -8px; /* 順位エリアに重なるように調整 */
+        /* margin-left: 65px; */ /* ポスターの横に寄せる */
+      }
+     
+      .title {
+        font-size: 1.1em; /* タイトルを少し小さく */
+        line-height: 1.3;
+      }
+      .score-block { margin-bottom: 3px; }
+      .score-text { font-size: 1.3em; } /* スコアも調整 */
+      .star-rating { font-size: 1.1em; }
+     
+      .vod-badges { margin-top: 2px; margin-bottom: 2px; }
+      .synopsis-area {
+        flex-basis: 100%;
+        /* margin-top: 10px; */
+        margin-left: 0; /* 全幅を使う */
+      }
+      .synopsis-text { font-size: 0.8em; }
+     
+      .content-area-mobile-wrap {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        padding: 0 14px; /* これを追加 */
+      }
+    }
+    /* ========================================================= */
     </style>
 </head>
 <body>
@@ -439,39 +513,44 @@ else:
                 <div class="rank {{ rank_class }}">{{ rank }}</div>
             </div>
             
-            {% if row['詳細URL'] != '#' %}
-            <a href="{{ row['詳細URL'] }}" target="_blank" class="content-link-wrap">
-            {% endif %}
-                <div class="poster">
+            <div class="content-area-mobile-wrap"> <div class="poster">
                     {% if row['画像URL'] %}
                     <img src="{{ row['画像URL'] }}" alt="{{ row['タイトル'] }}">
                     {% else %}
                     <div style="width:100%;height:100%;background:#ccc;display:flex;align-items:center;justify-content:center;font-size:0.8em;">No Image</div>
                     {% endif %}
                 </div>
+                
                 <div class="info">
-                    <div class="score-block">
-                        <div class="star-rating">
-                            <div class="stars-outer">★★★★★</div>
-                            <div class="stars-inner" style="width: {{ score_percent }}%;">★★★★★</div>
+                    {% if row['詳細URL'] != '#' %}
+                    <a href="{{ row['詳細URL'] }}" target="_blank" class="content-link-wrap" style="padding:0; margin:0; flex-direction: column; align-items: flex-start;">
+                    {% endif %}
+                        <div class="score-block">
+                            <div class="star-rating">
+                                <div class="stars-outer">★★★★★</div>
+                                <div class="stars-inner" style="width: {{ score_percent }}%;">★★★★★</div>
+                            </div>
+                            <div class="score-text">{{ score | round(1) }}</div>
                         </div>
-                        <div class="score-text">{{ score | round(1) }}</div>
-                    </div>
-                    <div class="title">
-                        {# ⭐ 修正: 映画の場合のみ絵文字を追加、ドラマの場合は何も追加しない #}
-                        {% if row['コンテンツタイプ'] == '映画' %}
-                        <span class="movie-emoji">🎬</span> 
-                        {% endif %}
-                        {{ row['タイトル'] }}
-                    </div>
-                    <div class="genre-info">{{ row['ジャンル'] }}</div>
-                    <div class="release-date">{{ row['公開・初回放送'] }}</div>
+                        <div class="title">
+                            {% if row['コンテンツタイプ'] == '映画' %}
+                            <span class="movie-emoji">🎬</span> 
+                            {% endif %}
+                            {{ row['タイトル'] }}
+                        </div>
+                        <div class="genre-info">{{ row['ジャンル'] }}</div>
+                        <div class="release-date">{{ row['公開・初回放送'] }}</div>
+                    {% if row['詳細URL'] != '#' %}
+                    </a>
+                    {% endif %}
+
                     <div class="vod-badges">
                         {% for vod in row['vod_sources'] %}
                         {% set badge_class = 'Disney\\+' if vod == 'Disney+' else vod %}
                         <span class="vod-badge {{ badge_class }}">{{ vod }}</span>
                         {% endfor %}
                     </div>
+                    
                     {% if has_synopsis %}
                     <div class="synopsis-area">
                         <button class="synopsis-toggle-button js-toggle-synopsis" data-expanded="false">あらすじを見る▼</button>
@@ -481,10 +560,8 @@ else:
                     </div>
                     {% endif %}
                 </div>
-            {% if row['詳細URL'] != '#' %}
-            </a>
-            {% endif %}
-        </div>
+                
+            </div> </div>
         {% endfor %}
     </div>
 
@@ -544,10 +621,12 @@ else:
                     
                     if (!isExpanded) {
                         full.classList.add('expanded');
+                        // 展開時にscrollHeightを使って高さを取得
                         full.style.maxHeight = full.scrollHeight + 'px'; 
                         this.textContent = '一部を隠す▲';
                         this.setAttribute('data-expanded', 'true');
                     } else {
+                        // 収縮時に現在のscrollHeightを取得してから高さを0にする
                         full.style.maxHeight = full.scrollHeight + 'px'; 
                         setTimeout(() => {
                             full.style.maxHeight = '0px';
