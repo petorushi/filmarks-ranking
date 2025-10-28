@@ -324,6 +324,7 @@ else:
 <head>
     <meta charset="UTF-8">
     <title>Filmarks VODランキング(映画・ドラマ)</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎞️</text></svg>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
