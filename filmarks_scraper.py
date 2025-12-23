@@ -23,7 +23,7 @@ BASE_DOMAIN = "https://filmarks.com"
 VOD_LIST_URLS = { 
     "Amazon": { "映画": "/list/vod/prime_video?page={}", "ドラマ": "/list-drama/vod/prime_video?page={}" },
     "Netflix": { "映画": "/list/vod/netflix?page={}", "ドラマ": "/list-drama/vod/netflix?page={}" },
-    "Disney+": { "映画": "/list/vod/disneyplus?page={}", "ドラマ": "/list-drama/vod/disneyplus?page={}" }
+    #"Disney+": { "映画": "/list/vod/disneyplus?page={}", "ドラマ": "/list-drama/vod/disneyplus?page={}" }
 }
 
 # 「スリラー」を除外
