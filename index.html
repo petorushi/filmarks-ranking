@@ -72,6 +72,49 @@
         }
         /* --- 追加CSS終了 --- */
    
+    /* ============== 評価レート上限フィルター ============== */
+    .rating-filter-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .rating-btn {
+        background-color: #f0f0f0;
+        color: #555;
+        border: 1px solid #ccc;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.95em;
+        cursor: pointer;
+        transition: all 0.15s;
+        outline: none;
+        user-select: none;
+        font-weight: bold;
+        line-height: 1;
+    }
+    .rating-btn:hover { background-color: #0088cc; color: white; border-color: #0088cc; }
+    .rating-btn:active { transform: scale(0.94); }
+    .rating-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .rating-btn:disabled:hover { background-color: #f0f0f0; color: #555; border-color: #ccc; }
+    #rate-display {
+        font-size: 1.4em;
+        font-weight: bold;
+        color: orange;
+        min-width: 42px;
+        text-align: center;
+        display: inline-block;
+        letter-spacing: 0.02em;
+    }
+    .rating-label {
+        font-size: 0.85em;
+        color: #888;
+        margin-left: 4px;
+    }
+    @media (max-width: 500px) {
+        .rating-btn { padding: 4px 9px; font-size: 0.9em; }
+        #rate-display { font-size: 1.2em; }
+    }
     /* ============== iPhone SE2 (375px) 対応 CSSの復活 ============== */
     @media (max-width: 500px) {
       body { padding: 10px; }
@@ -160,6 +203,18 @@
             </div>
         </div>
         
+        <div class="filter-section rating-filter">
+            <div class="filter-title">評価レート上限:</div>
+            <div class="rating-filter-controls">
+                <button class="rating-btn" id="rate-minus-1" title="-1.0">&#171;</button>
+                <button class="rating-btn" id="rate-minus-01" title="-0.1">&#8249;</button>
+                <span id="rate-display">5.0</span>
+                <button class="rating-btn" id="rate-plus-01" title="+0.1">&#8250;</button>
+                <button class="rating-btn" id="rate-plus-1" title="+1.0">&#187;</button>
+                <span class="rating-label">以下を表示</span>
+            </div>
+        </div>
+
         <div class="filter-section genre-filters">
             <div class="filter-title">ジャンル:</div>
             <div class="filter-buttons">
@@ -73528,6 +73583,35 @@ Netflixで2025年12月19日から配信開始</p>
         document.addEventListener('DOMContentLoaded', function() {
             const movieItems = document.querySelectorAll('.movie-item');
 
+            // --- 評価レート上限フィルター ---
+            let maxRating = 5.0;
+            const rateDisplay  = document.getElementById('rate-display');
+            const btnMinus1    = document.getElementById('rate-minus-1');
+            const btnMinus01   = document.getElementById('rate-minus-01');
+            const btnPlus01    = document.getElementById('rate-plus-01');
+            const btnPlus1     = document.getElementById('rate-plus-1');
+
+            function updateRateUI() {
+                rateDisplay.textContent = maxRating.toFixed(1);
+                btnMinus1.disabled  = maxRating <= 0.0;
+                btnMinus01.disabled = maxRating <= 0.0;
+                btnPlus1.disabled   = maxRating >= 5.0;
+                btnPlus01.disabled  = maxRating >= 5.0;
+            }
+
+            function changeRating(delta) {
+                maxRating = Math.round((maxRating + delta) * 10) / 10;
+                maxRating = Math.min(5.0, Math.max(0.0, maxRating));
+                updateRateUI();
+                applyFilters();
+            }
+
+            btnMinus1.addEventListener('click',  () => changeRating(-1.0));
+            btnMinus01.addEventListener('click', () => changeRating(-0.1));
+            btnPlus01.addEventListener('click',  () => changeRating(0.1));
+            btnPlus1.addEventListener('click',   () => changeRating(1.0));
+            // ---------------------------------
+
             function applyFilters() {
                 const activeGenres = Array.from(document.querySelectorAll('.genre-button.active')).map(btn => btn.getAttribute('data-genre'));
                 const activeVods = Array.from(document.querySelectorAll('.vod-button.active')).map(btn => btn.getAttribute('data-vod'));
@@ -73537,12 +73621,15 @@ Netflixで2025年12月19日から配信開始</p>
                     const movieGenres = (item.getAttribute('data-genres') || '').split(',');
                     const movieVods = (item.getAttribute('data-vods') || '').split(',');
                     const movieType = item.getAttribute('data-type');
-                    
-                    const showByGenre = activeGenres.length === 0 || activeGenres.some(g => movieGenres.includes(g));
-                    const showByVod = activeVods.length === 0 || activeVods.some(v => movieVods.includes(v));
-                    const showByType = activeTypes.length === 0 || activeTypes.includes(movieType);
-                    
-                    item.classList.toggle('hidden', !(showByGenre && showByVod && showByType));
+                    const scoreEl = item.querySelector('.score-text');
+                    const score = scoreEl ? parseFloat(scoreEl.textContent) : 0;
+
+                    const showByGenre  = activeGenres.length === 0 || activeGenres.some(g => movieGenres.includes(g));
+                    const showByVod    = activeVods.length === 0   || activeVods.some(v => movieVods.includes(v));
+                    const showByType   = activeTypes.length === 0  || activeTypes.includes(movieType);
+                    const showByRating = isNaN(score) || score <= maxRating;
+
+                    item.classList.toggle('hidden', !(showByGenre && showByVod && showByType && showByRating));
                 });
             }
 
