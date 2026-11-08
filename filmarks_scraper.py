@@ -43,6 +43,7 @@ movie_data_map = {}
 all_processed_genres = set() 
 movie_processed_count = 0 
 synopsis_fetched_count = 0 
+non_svod_skipped_count = 0  # 見放題ではない（レンタル・購入のみ）ため除外した件数
 available_content_types = set()
 
 print("スクレイピングを開始します...")
@@ -212,6 +213,13 @@ for vod_name, list_types in VOD_LIST_URLS.items():
                     if not movie_id: 
                         continue
 
+                    # 見放題のみ対象: 一覧ページの各作品には、そのサービスでの提供形態が
+                    # 「見放題(label-svod)・レンタル(label-tvod)・購入(label-est)」のラベルで付いている。
+                    # 見放題ラベルが無い作品は会員でも追加料金が必要なので除外する
+                    if not movie.select_one('.c-vod-service-types__label.label-svod'):
+                        non_svod_skipped_count += 1
+                        continue
+
                     # ポスターURL
                     poster_element = movie.select_one('div.p-content-cassette__jacket img, div.c2-poster-m img') 
                     poster_url = poster_element.get('data-src') if poster_element else None
@@ -299,6 +307,7 @@ df = pd.DataFrame(list(movie_data_map.values()))
 print(f"\n{'='*60}")
 print(f"✅ 収集完了: {movie_processed_count}件")
 print(f"✅ あらすじ取得成功: {synopsis_fetched_count}件")
+print(f"✅ 見放題ではないため除外: {non_svod_skipped_count}件")
 print(f"{'='*60}\n")
 
 if df.empty:
@@ -323,411 +332,461 @@ else:
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Filmarks VODランキング(映画・ドラマ)</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎞️</text></svg>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VOD 統合ランキング</title>
+    <meta name="description" content="Filmarks の評価で並べた Amazon Prime Video と Netflix の映画・ドラマのランキング">
+    <meta name="theme-color" content="#FBF9F8">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%238E1B2E'/><text x='50' y='74' font-size='68' font-family='Arial Narrow,Arial' font-weight='700' text-anchor='middle' fill='%23FBF9F8'>1</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
-    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-    h1 { color: #0088cc; border-bottom: 3px solid #0088cc; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
-    .update-time { text-align: right; font-size: 0.85em; color: #777; margin-top: -10px; margin-bottom: 15px; padding-right: 10px; }
-    .update-time span { font-weight: bold; color: #555; margin-left: 5px; }
-    .filter-section { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 15px; }
-    .filter-title { font-size: 0.9em; font-weight: bold; color: #555; margin-bottom: 5px; }
-    .filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-    .genre-button, .vod-button, .type-button { background-color: #f0f0f0; color: #555; border: 1px solid #ccc; padding: 5px 12px; border-radius: 20px; font-size: 0.9em; cursor: pointer; transition: all 0.2s; outline: none; user-select: none; }
-   
-    /* VODボタンの色 */
-    .vod-button[data-vod="Amazon"] { background-color: #f0f8ff; border-color: #0088cc; color: #0088cc; }
-    .vod-button[data-vod="Netflix"] { background-color: #fff0f1; border-color: #e50914; color: #e50914; }
-    .vod-button[data-vod="Disney+"] { background-color: #f1f3ff; border-color: #113ccf; color: #113ccf; }
-
-    /* コンテンツタイプの色 */
-    .type-button[data-type="映画"] { background-color: #f7f7e0; border-color: #a0a000; color: #a0a000; }
-    .type-button[data-type="ドラマ"] { background-color: #e0f7f7; border-color: #008080; color: #008080; }
-
-    /* アクティブなボタン */
-    .genre-button.active { background-color: #0088cc; color: white; border-color: #0088cc; }
-    .vod-button.active[data-vod="Amazon"] { background-color: #0088cc; color: white; }
-    .vod-button.active[data-vod="Netflix"] { background-color: #e50914; color: white; }
-    .vod-button.active[data-vod="Disney+"] { background-color: #113ccf; color: white; }
-    .type-button.active[data-type="映画"] { background-color: #a0a000; color: white; }
-    .type-button.active[data-type="ドラマ"] { background-color: #008080; color: white; }
-   
-    .movie-item { border-left: 5px solid transparent; transition: all 0.3s; display: flex; align-items: stretch; padding: 15px 0; border-bottom: 1px dashed #eee; position: relative; }
-    .movie-item.hidden { display: none; }
-    .rating-highlight { background-color: #fff9e6; border-left: 5px solid #ffcc33; }
-    .movie-item:hover { background-color: #fcf9f0; }
-    .rank-area { width: 90px; flex-shrink: 0; padding-right: 15px; padding-left: 10px; display: flex; justify-content: center; align-items: center; }
-    .rank { font-size: 3.5em; font-weight: bold; text-align: center; color: #aaa; line-height: 1; }
-    .rank.top3 { color: #ffbf00; }
-    .rank.top10 { color: #0088cc; }
-    .content-link-wrap { display: flex; flex-grow: 1; align-items: flex-start; text-decoration: none; color: inherit; transition: color 0.3s; padding: 15px 0; margin: -15px 0; }
-    .content-link-wrap:hover .title { color: #0088cc; text-decoration: underline; }
-    .poster { width: 100px; height: auto; margin-right: 20px; flex-shrink: 0; display: flex; padding-top: 9px;}
-    .poster img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
-    .info { flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-right: 15px; min-width: 250px; }
-    .title { font-size: 1.2em; font-weight: 600; color: #333; margin-bottom: 5px; }
-    .release-date, .genre-info { font-size: 0.85em; color: #777; margin-bottom: 5px; line-height: 1.4; }
-    .score-block { display: flex; align-items: center; margin-bottom: 5px; }
-    .star-rating { display: inline-flex; align-items: center; font-size: 1.3em; margin-right: 8px; position: relative; }
-    .stars-outer { position: relative; display: inline-flex; color: #d9d1b9; white-space: nowrap; }
-    .stars-inner { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; width: 0; color: orange; }
-    .score-text { font-size: 1.5em; font-weight: bold; color: orange; }
-    .vod-badges { display: flex; gap: 5px; margin-top: 5px; margin-bottom: 5px; }
-    .vod-badge { font-size: 0.75em; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: none; border: 1px solid; white-space: nowrap; }
-    .vod-badge.Amazon { color: #0088cc; border-color: #0088cc; }
-    .vod-badge.Netflix { color: #e50914; border-color: #e50914; }
-    .vod-badge.Disney\\+ { color: #113ccf; border-color: #113ccf; }
-    .synopsis-area { flex-basis: 100%; font-size: 0.85em; color: #555; line-height: 1.5; display: flex; flex-direction: column; padding-top: 5px; }
-    .synopsis-toggle-button { background: none; border: none; color: orange; cursor: pointer; padding: 5px 0; font-size: 0.9em; font-weight: bold; text-align: left; }
-    .synopsis-text { overflow: hidden; transition: max-height 0.5s ease-in-out; max-height: 0; padding: 0; margin-top: 0; }
-    .synopsis-text.expanded { padding: 10px 0; max-height: 1000px !important; }
-    .synopsis-text p { margin: 0; }
-    .movie-emoji { margin-right: 5px; } /* 映画絵文字用のスペース調整 */
-
-        /* --- 追加CSS開始 --- */
-        .content-area-mobile-wrap {
-            display: flex; /* これを追加 */
-        }
-        /* --- 追加CSS終了 --- */
-   
-    /* ============== 評価レート上限フィルター ============== */
-    .rating-filter-controls {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex-wrap: wrap;
+    /* 配色: 明るい映画館のロビー。客席のボルドーをアクセントにし、順位と高評価の数字だけに使う */
+    :root {
+        --bg: #FBF9F8;
+        --raised: #F0EBEA;
+        --line: #E6DCDC;
+        --accent: #8E1B2E;
+        --ink: #2A1A1E;
+        --ink-dim: #5E4C50;
+        --muted: #8E7C80;
+        --amazon: #1C6AA3;
+        --netflix: #C4122F;
+        --disney: #2B44C2;
+        --font-num: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+        --font-body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+        --gutter: clamp(16px, 4vw, 40px);
     }
-    .rating-btn {
-        background-color: #f0f0f0;
-        color: #555;
-        border: 1px solid #ccc;
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 0.95em;
-        cursor: pointer;
-        transition: all 0.15s;
-        outline: none;
-        user-select: none;
-        font-weight: bold;
-        line-height: 1;
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.7;
     }
-    .rating-btn:hover { background-color: #0088cc; color: white; border-color: #0088cc; }
-    .rating-btn:active { transform: scale(0.94); }
-    .rating-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-    .rating-btn:disabled:hover { background-color: #f0f0f0; color: #555; border-color: #ccc; }
-    #rate-display {
-        font-size: 1.4em;
-        font-weight: bold;
-        color: orange;
-        min-width: 42px;
-        text-align: center;
-        display: inline-block;
+    a { color: inherit; }
+    button { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+    /* ---------- ヘッダー ---------- */
+    .masthead {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: clamp(40px, 8vw, 88px) var(--gutter) 28px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+        gap: 24px;
+    }
+    .masthead h1 {
+        margin: 0;
+        font-size: clamp(30px, 5.4vw, 52px);
+        font-weight: 700;
+        line-height: 1.2;
         letter-spacing: 0.02em;
     }
-    .rating-label {
-        font-size: 0.85em;
-        color: #888;
-        margin-left: 4px;
-    }
-    @media (max-width: 500px) {
-        .rating-btn { padding: 4px 9px; font-size: 0.9em; }
-        #rate-display { font-size: 1.2em; }
-    }
-    /* ============================================================= */
+    .masthead .lede { margin: 12px 0 0; color: var(--ink-dim); font-size: 14px; max-width: 34em; }
+    .masthead .updated { margin: 0; color: var(--muted); font-size: 13px; text-align: right; white-space: nowrap; }
+    .masthead .updated time { font-family: var(--font-num); font-size: 20px; font-weight: 500; color: var(--ink-dim); letter-spacing: 0.04em; margin-left: 6px; }
 
-    /* ============== iPhone SE2 (375px) 対応 CSSの復活 ============== */
-    @media (max-width: 500px) {
-      body { padding: 10px; }
-      .container { padding: 15px; }
-     
-      .filter-buttons { gap: 6px; }
-      .genre-button, .vod-button, .type-button { padding: 4px 10px; font-size: 0.85em; }
-     
-      .movie-item {
-        flex-direction: column; /* 縦に積み重ねる */
-        align-items: flex-start;
-        padding: 10px 0;
-        border-bottom: 1px solid #eee;
-      }
-      .content-link-wrap {
-        /* flex-direction: column; */
-        padding: 0 14px;
-        margin: 0;
-      }
-     
-      .rank-area {
-        width: 100%;
-        height: 40px;
-        padding: 0;
-        justify-content: flex-start; /* 順位を左に寄せる */
-        margin-bottom: 10px;
-      }
-      .rank {
-        font-size: 2.5em; /* 順位を少し小さく */
-        width: 50px;
-      }
-     
-      .poster {
-        width: 80px; /* ポスターを小さく */
-        height: auto;
-        margin-right: 15px;
-        padding-top: 0;
-      }
-     
-      .info {
-        min-width: unset;
-        padding-right: 0;
-        margin-top: -8px; /* 順位エリアに重なるように調整 */
-        /* margin-left: 65px; */ /* ポスターの横に寄せる */
-      }
-     
-      .title {
-        font-size: 1.1em; /* タイトルを少し小さく */
-        line-height: 1.3;
-      }
-      .score-block { margin-bottom: 3px; }
-      .score-text { font-size: 1.3em; } /* スコアも調整 */
-      .star-rating { font-size: 1.1em; }
-     
-      .vod-badges { margin-top: 2px; margin-bottom: 2px; }
-      .synopsis-area {
-        flex-basis: 100%;
-        /* margin-top: 10px; */
-        margin-left: 0; /* 全幅を使う */
-      }
-      .synopsis-text { font-size: 0.8em; }
-     
-      .content-area-mobile-wrap {
-        display: flex;
-        flex-direction: row;
-        width: 100%;
-        padding: 0 14px; /* これを追加 */
-      }
+    /* ---------- 絞り込み（上部に固定） ---------- */
+    .filters {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(251, 249, 248, 0.94);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
     }
-    /* ========================================================= */
+    .filters-inner {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 14px var(--gutter);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 28px;
+    }
+    .filter-group { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .filter-group > .group-name { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink-dim);
+        padding: 4px 13px;
+        border-radius: 999px;
+        font-size: 13px;
+        line-height: 1.6;
+        cursor: pointer;
+        transition: background-color .15s, color .15s, border-color .15s;
+    }
+    .chip:hover { border-color: var(--ink-dim); color: var(--ink); }
+    .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 700; }
+    .chip.vod[data-vod="Amazon"][aria-pressed="true"] { background: var(--amazon); border-color: var(--amazon); }
+    .chip.vod[data-vod="Netflix"][aria-pressed="true"] { background: var(--netflix); border-color: var(--netflix); }
+    .chip.vod[data-vod="Disney+"][aria-pressed="true"] { background: var(--disney); border-color: var(--disney); }
+
+    .rate-control { display: flex; align-items: center; gap: 2px; }
+    .rate-step {
+        width: 30px; height: 30px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink-dim);
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 15px;
+        line-height: 1;
+    }
+    .rate-step:hover:not(:disabled) { border-color: var(--ink-dim); color: var(--ink); }
+    .rate-step:disabled { opacity: .3; cursor: not-allowed; }
+    .rate-value { font-family: var(--font-num); font-weight: 800; font-size: 24px; color: var(--accent); min-width: 2.2em; text-align: center; line-height: 1; }
+    .rate-note { color: var(--muted); font-size: 12px; margin-left: 6px; white-space: nowrap; }
+
+    .filter-genres { flex-basis: 100%; }
+    .filter-genres .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
+    .filter-genres .chips::-webkit-scrollbar { display: none; }
+    .chip { flex-shrink: 0; }
+
+    .result-bar {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 18px var(--gutter) 6px;
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        color: var(--muted);
+        font-size: 13px;
+    }
+    .result-bar strong { font-family: var(--font-num); font-weight: 800; font-size: 22px; color: var(--ink); margin-right: 3px; letter-spacing: 0.02em; }
+    .reset {
+        border: 0; background: none; padding: 0;
+        color: var(--ink-dim);
+        text-decoration: underline; text-underline-offset: 3px;
+        cursor: pointer; font-size: 13px;
+    }
+    .reset[hidden] { display: none; }
+
+    /* ---------- ランキング ---------- */
+    .ranking { list-style: none; margin: 0 auto; padding: 0 var(--gutter) 96px; max-width: 1040px; }
+    .entry {
+        display: grid;
+        grid-template-columns: 4.2rem 76px 1fr auto;
+        grid-template-areas: "rank poster body score";
+        gap: 0 20px;
+        align-items: start;
+        padding: 18px 0;
+        border-bottom: 1px solid var(--line);
+        content-visibility: auto;
+        contain-intrinsic-size: auto 150px;
+    }
+    .entry[hidden] { display: none; }
+    .rank {
+        grid-area: rank;
+        font-family: var(--font-num);
+        font-weight: 800;
+        font-size: 44px;
+        line-height: .9;
+        color: var(--muted);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        padding-top: 2px;
+    }
+    .poster {
+        grid-area: poster;
+        aspect-ratio: 5 / 7;
+        border-radius: 4px;
+        overflow: hidden;
+        background: var(--raised);
+        display: block;
+    }
+    .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .poster .no-image { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; }
+    .body { grid-area: body; min-width: 0; }
+    .title { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.45; }
+    .title a { text-decoration: none; }
+    .title a:hover { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+    .facts { margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink-dim); font-size: 12.5px; }
+    .facts .kind { color: var(--ink); }
+    .where { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .svc { font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 3px; border: 1px solid currentColor; line-height: 1.6; }
+    .svc[data-vod="Amazon"] { color: var(--amazon); }
+    .svc[data-vod="Netflix"] { color: var(--netflix); }
+    .svc[data-vod="Disney+"] { color: var(--disney); }
+
+    .score { grid-area: score; text-align: right; min-width: 64px; }
+    .score .num { font-family: var(--font-num); font-weight: 800; font-size: 32px; line-height: .95; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .score .meter { display: block; margin: 8px 0 0 auto; width: 64px; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+    .score .meter i { display: block; height: 100%; background: var(--ink-dim); }
+    .entry.high .score .num { color: var(--accent); }
+    .entry.high .score .meter i { background: var(--accent); }
+
+    /* あらすじ（開閉） */
+    .synopsis { margin-top: 10px; }
+    .synopsis-toggle {
+        border: 0; background: none; padding: 2px 0; cursor: pointer;
+        color: var(--ink-dim); font-size: 13px;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .synopsis-toggle:hover { color: var(--ink); }
+    .synopsis-toggle .caret { display: inline-block; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .25s; }
+    .synopsis-toggle[aria-expanded="true"] .caret { transform: rotate(-135deg) translateY(-1px); }
+    .synopsis-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease; }
+    .synopsis-panel.open { grid-template-rows: 1fr; }
+    .synopsis-panel > div { overflow: hidden; }
+    .synopsis-panel p { margin: 8px 0 0; color: var(--ink-dim); font-size: 13.5px; line-height: 1.85; max-width: 42em; }
+
+    /* 1〜3位: 大きな順位と大きなポスターで目立たせる */
+    .entry.podium { grid-template-columns: 6.4rem 120px 1fr auto; padding: 28px 0; contain-intrinsic-size: auto 230px; }
+    .entry.podium .rank { font-size: 96px; color: var(--accent); letter-spacing: -0.02em; }
+    .entry.podium .title { font-size: 21px; }
+    .entry.podium .score .num { font-size: 44px; }
+
+    /* 4〜10位: 順位だけ明るくする */
+    .entry.top10 .rank { color: var(--ink-dim); }
+
+    .empty { max-width: 1040px; margin: 0 auto; padding: 48px var(--gutter); color: var(--ink-dim); }
+    .empty[hidden] { display: none; }
+
+    /* 読み込み時の演出は 1〜3 位の順位が順に灯る 1 回だけ */
+    @keyframes light-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    .entry.podium .rank { animation: light-up .7s cubic-bezier(.2,.7,.2,1) both; }
+    .entry.podium:nth-child(2) .rank { animation-delay: .12s; }
+    .entry.podium:nth-child(3) .rank { animation-delay: .24s; }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+
+    /* ---------- スマホ幅 ---------- */
+    @media (max-width: 640px) {
+        body { font-size: 14px; }
+        /* スマホでは絞り込みが画面の大半を占めるので固定しない */
+        .filters { position: static; }
+        .masthead { grid-template-columns: 1fr; gap: 10px; padding-top: 36px; padding-bottom: 20px; }
+        .masthead .updated { text-align: left; }
+        .filters-inner { gap: 10px 18px; padding-top: 10px; padding-bottom: 10px; }
+        .filter-group { flex-basis: 100%; }
+        .filter-group .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
+        .filter-group .chips::-webkit-scrollbar { display: none; }
+        .filter-group > .group-name { min-width: 4.5em; }
+        .entry {
+            grid-template-columns: 2.6rem 64px 1fr;
+            grid-template-areas: "rank poster body" ". poster score";
+            gap: 0 12px;
+            padding: 14px 0;
+        }
+        .rank { font-size: 30px; }
+        .title { font-size: 15.5px; }
+        .score { grid-area: score; text-align: left; display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+        .score .num { font-size: 24px; }
+        .score .meter { margin: 0; width: 56px; }
+        .entry.podium { grid-template-columns: 3.4rem 92px 1fr; padding: 20px 0; }
+        .entry.podium .rank { font-size: 56px; }
+        .entry.podium .title { font-size: 17px; }
+        .entry.podium .score .num { font-size: 30px; }
+    }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>VOD 統合ランキング(映画・ドラマ)</h1>
-        <div class="update-time">&#128337; 最終更新日: <span>{{ current_date }}</span></div>
-        
-        <div class="filter-section content-type-filters">
-            <div class="filter-title">コンテンツタイプ:</div>
-            <div class="filter-buttons">
-                {% for type in display_content_types %}
-                <button class="type-button" data-type="{{ type }}">{{ type }}</button>
-                {% endfor %}
+    <header class="masthead">
+        <div>
+            <h1>VOD 統合ランキング</h1>
+            <p class="lede">Amazon Prime Video と Netflix の見放題で観られる映画・ドラマを、Filmarks の評価が高い順に並べています。</p>
+        </div>
+        <p class="updated">最終更新<time datetime="{{ current_date | replace('.', '-') }}">{{ current_date }}</time></p>
+    </header>
+
+    <div class="filters">
+        <div class="filters-inner">
+            <div class="filter-group" role="group" aria-label="種類">
+                <span class="group-name">種類</span>
+                <div class="chips">
+                    {% for type in display_content_types %}
+                    <button type="button" class="chip type" data-type="{{ type }}" aria-pressed="false">{{ type }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="filter-group" role="group" aria-label="配信サービス">
+                <span class="group-name">配信</span>
+                <div class="chips">
+                    {% for vod in available_vods %}
+                    <button type="button" class="chip vod" data-vod="{{ vod }}" aria-pressed="false">{{ vod }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="filter-group" role="group" aria-label="評価の上限">
+                <span class="group-name">評価の上限</span>
+                <div class="rate-control">
+                    <button type="button" class="rate-step" data-delta="-1" aria-label="上限を 1.0 下げる">&laquo;</button>
+                    <button type="button" class="rate-step" data-delta="-0.1" aria-label="上限を 0.1 下げる">&lsaquo;</button>
+                    <output class="rate-value" id="rate-value" aria-live="polite">5.0</output>
+                    <button type="button" class="rate-step" data-delta="0.1" aria-label="上限を 0.1 上げる">&rsaquo;</button>
+                    <button type="button" class="rate-step" data-delta="1" aria-label="上限を 1.0 上げる">&raquo;</button>
+                    <span class="rate-note">以下を表示</span>
+                </div>
+            </div>
+            <div class="filter-group filter-genres" role="group" aria-label="ジャンル">
+                <span class="group-name">ジャンル</span>
+                <div class="chips">
+                    {% for genre in display_genres %}
+                    <button type="button" class="chip genre" data-genre="{{ genre }}" aria-pressed="false">{{ genre }}</button>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-        
-        <div class="filter-section rating-filter">
-            <div class="filter-title">評価レート上限:</div>
-            <div class="rating-filter-controls">
-                <button class="rating-btn" id="rate-minus-1" title="-1.0">&#171;</button>
-                <button class="rating-btn" id="rate-minus-01" title="-0.1">&#8249;</button>
-                <span id="rate-display">5.0</span>
-                <button class="rating-btn" id="rate-plus-01" title="+0.1">&#8250;</button>
-                <button class="rating-btn" id="rate-plus-1" title="+1.0">&#187;</button>
-                <span class="rating-label">以下を表示</span>
-            </div>
-        </div>
-        
-        <div class="filter-section genre-filters">
-            <div class="filter-title">ジャンル:</div>
-            <div class="filter-buttons">
-                {% for genre in display_genres %}
-                <button class="genre-button" data-genre="{{ genre }}">{{ genre }}</button>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <div class="filter-section vod-filters" style="border-bottom: none; margin-bottom: 30px;">
-            <div class="filter-title">VODサービス:</div>
-            <div class="filter-buttons">
-                {% for vod in available_vods %}
-                <button class="vod-button" data-vod="{{ vod }}">{{ vod }}</button>
-                {% endfor %}
-            </div>
-        </div>
-        
+    </div>
+
+    <div class="result-bar">
+        <span><strong id="result-count">{{ data | length }}</strong>件を表示中</span>
+        <button type="button" class="reset" id="reset" hidden>絞り込みを解除</button>
+    </div>
+
+    <ol class="ranking">
         {% for index, row in data.iterrows() %}
         {% set rank = loop.index %}
         {% set score = row['評価'] %}
-        {% set score_percent = (score / 5.0 * 100) %}
-        {% set is_highlight = score >= 4.0 %}
-        {% set rank_class = 'top3' if rank <= 3 else ('top10' if rank <= 10 else '') %}
+        {% set tier = 'podium' if rank <= 3 else ('top10' if rank <= 10 else '') %}
         {% set synopsis_content = row['あらすじ'] | default('') | trim %}
-        {% set has_synopsis = synopsis_content and synopsis_content != "あらすじ情報なし" and synopsis_content | length > 0 %}
-        
-        <div class="movie-item {% if is_highlight %}rating-highlight{% endif %}" 
-             data-genres="{{ row['ジャンルリスト'] | join(',') }}"
-             data-vods="{{ row['vod_sources'] | join(',') }}"
-             data-type="{{ row['コンテンツタイプ'] }}">
-            
-            <div class="rank-area">
-                <div class="rank {{ rank_class }}">{{ rank }}</div>
-            </div>
-            
-            <div class="content-area-mobile-wrap"> <div class="poster">
-                    {% if row['画像URL'] %}
-                    <img src="{{ row['画像URL'] }}" alt="{{ row['タイトル'] }}">
-                    {% else %}
-                    <div style="width:100%;height:100%;background:#ccc;display:flex;align-items:center;justify-content:center;font-size:0.8em;">No Image</div>
-                    {% endif %}
-                </div>
-                
-                <div class="info">
-                    {% if row['詳細URL'] != '#' %}
-                    <a href="{{ row['詳細URL'] }}" target="_blank" class="content-link-wrap" style="padding:0; margin:0; flex-direction: column; align-items: flex-start;">
-                    {% endif %}
-                        <div class="score-block">
-                            <div class="star-rating">
-                                <div class="stars-outer">★★★★★</div>
-                                <div class="stars-inner" style="width: {{ score_percent }}%;">★★★★★</div>
-                            </div>
-                            <div class="score-text">{{ score | round(1) }}</div>
-                        </div>
-                        <div class="title">
-                            {% if row['コンテンツタイプ'] == '映画' %}
-                            <span class="movie-emoji">🎬</span> 
-                            {% endif %}
-                            {{ row['タイトル'] }}
-                        </div>
-                        <div class="genre-info">{{ row['ジャンル'] }}</div>
-                        <div class="release-date">{{ row['公開・初回放送'] }}</div>
-                    {% if row['詳細URL'] != '#' %}
-                    </a>
-                    {% endif %}
+        {% set has_synopsis = synopsis_content and synopsis_content != "あらすじ情報なし" %}
+        {% set has_link = row['詳細URL'] != '#' %}
+        {% set genres_text = row['ジャンル'] | replace('ジャンル:', '') %}
+        <li class="entry {{ tier }} {% if score >= 4.0 %}high{% endif %}"
+            data-genres="{{ row['ジャンルリスト'] | join(',') }}"
+            data-vods="{{ row['vod_sources'] | join(',') }}"
+            data-type="{{ row['コンテンツタイプ'] }}"
+            data-score="{{ score }}">
+            <div class="rank" aria-label="{{ rank }}位">{{ rank }}</div>
 
-                    <div class="vod-badges">
-                        {% for vod in row['vod_sources'] %}
-                        {% set badge_class = 'Disney\\+' if vod == 'Disney+' else vod %}
-                        <span class="vod-badge {{ badge_class }}">{{ vod }}</span>
-                        {% endfor %}
-                    </div>
-                    
-                    {% if has_synopsis %}
-                    <div class="synopsis-area">
-                        <button class="synopsis-toggle-button js-toggle-synopsis" data-expanded="false">あらすじを見る▼</button>
-                        <div class="synopsis-text js-synopsis-full">
-                            <p>{{ synopsis_content | e }}</p> 
-                        </div>
-                    </div>
-                    {% endif %}
+            {% if has_link %}<a class="poster" href="{{ row['詳細URL'] }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">{% else %}<div class="poster">{% endif %}
+                {# 画像が取れなかった行は pandas で NaN（float）になるため、文字列かどうかで判定する #}
+                {% if row['画像URL'] is string and row['画像URL'] %}
+                <img src="{{ row['画像URL'] }}" alt="" loading="{{ 'eager' if rank <= 6 else 'lazy' }}" decoding="async" width="300" height="420">
+                {% else %}
+                <span class="no-image">画像なし</span>
+                {% endif %}
+            {% if has_link %}</a>{% else %}</div>{% endif %}
+
+            <div class="body">
+                <h2 class="title">
+                    {% if has_link %}<a href="{{ row['詳細URL'] }}" target="_blank" rel="noopener">{{ row['タイトル'] }}</a>{% else %}{{ row['タイトル'] }}{% endif %}
+                </h2>
+                <p class="facts">
+                    <span class="kind">{{ row['コンテンツタイプ'] }}</span>
+                    <span>{{ row['公開・初回放送'] }}</span>
+                    {% if genres_text != 'N/A' %}<span>{{ genres_text }}</span>{% endif %}
+                </p>
+                <div class="where">
+                    {% for vod in row['vod_sources'] %}
+                    <span class="svc" data-vod="{{ vod }}">{{ vod }}</span>
+                    {% endfor %}
                 </div>
-                
-            </div> </div>
+                {% if has_synopsis %}
+                <div class="synopsis">
+                    <button type="button" class="synopsis-toggle" aria-expanded="false" aria-controls="syn-{{ rank }}"><span class="label">あらすじを読む</span><span class="caret" aria-hidden="true"></span></button>
+                    <div class="synopsis-panel" id="syn-{{ rank }}"><div><p>{{ synopsis_content | e }}</p></div></div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="score" aria-label="評価 {{ '%.1f' | format(score) }}">
+                <div class="num">{{ '%.1f' | format(score) }}</div>
+                <span class="meter" aria-hidden="true"><i style="width: {{ (score / 5.0 * 100) | round(1) }}%"></i></span>
+            </div>
+        </li>
         {% endfor %}
-    </div>
+    </ol>
+    <p class="empty" id="empty" hidden>条件に合う作品はありません。評価の上限を上げるか、絞り込みを解除してください。</p>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const movieItems = document.querySelectorAll('.movie-item');
+    document.addEventListener('DOMContentLoaded', function () {
+        const entries = Array.from(document.querySelectorAll('.entry'));
+        const chips = Array.from(document.querySelectorAll('.chip'));
+        const rateValue = document.getElementById('rate-value');
+        const rateSteps = Array.from(document.querySelectorAll('.rate-step'));
+        const resultCount = document.getElementById('result-count');
+        const resetButton = document.getElementById('reset');
+        const emptyNote = document.getElementById('empty');
+        const MAX_RATE = 5.0;
+        let maxRate = MAX_RATE;
 
-            // --- 評価レート上限フィルター ---
-            let maxRating = 5.0;
-            const rateDisplay  = document.getElementById('rate-display');
-            const btnMinus1    = document.getElementById('rate-minus-1');
-            const btnMinus01   = document.getElementById('rate-minus-01');
-            const btnPlus01    = document.getElementById('rate-plus-01');
-            const btnPlus1     = document.getElementById('rate-plus-1');
+        // 押されているチップの data 属性の値を集める
+        function activeValues(kind, attr) {
+            return chips
+                .filter(c => c.classList.contains(kind) && c.getAttribute('aria-pressed') === 'true')
+                .map(c => c.dataset[attr]);
+        }
 
-            function updateRateUI() {
-                rateDisplay.textContent = maxRating.toFixed(1);
-                btnMinus1.disabled  = maxRating <= 0.0;
-                btnMinus01.disabled = maxRating <= 0.0;
-                btnPlus1.disabled   = maxRating >= 5.0;
-                btnPlus01.disabled  = maxRating >= 5.0;
-            }
+        function updateRateUI() {
+            rateValue.textContent = maxRate.toFixed(1);
+            rateSteps.forEach(btn => {
+                const delta = parseFloat(btn.dataset.delta);
+                btn.disabled = delta < 0 ? maxRate <= 0 : maxRate >= MAX_RATE;
+            });
+        }
 
-            function changeRating(delta) {
-                maxRating = Math.round((maxRating + delta) * 10) / 10;
-                maxRating = Math.min(5.0, Math.max(0.0, maxRating));
-                updateRateUI();
-                applyFilters();
-            }
+        function applyFilters() {
+            const genres = activeValues('genre', 'genre');
+            const vods = activeValues('vod', 'vod');
+            const types = activeValues('type', 'type');
+            let shown = 0;
 
-            btnMinus1.addEventListener('click',  () => changeRating(-1.0));
-            btnMinus01.addEventListener('click', () => changeRating(-0.1));
-            btnPlus01.addEventListener('click',  () => changeRating(0.1));
-            btnPlus1.addEventListener('click',   () => changeRating(1.0));
-            // ---------------------------------
-
-            function applyFilters() {
-                const activeGenres = Array.from(document.querySelectorAll('.genre-button.active')).map(btn => btn.getAttribute('data-genre'));
-                const activeVods = Array.from(document.querySelectorAll('.vod-button.active')).map(btn => btn.getAttribute('data-vod'));
-                const activeTypes = Array.from(document.querySelectorAll('.type-button.active')).map(btn => btn.getAttribute('data-type'));
-
-                movieItems.forEach(item => {
-                    const movieGenres = (item.getAttribute('data-genres') || '').split(',');
-                    const movieVods = (item.getAttribute('data-vods') || '').split(',');
-                    const movieType = item.getAttribute('data-type');
-                    const scoreEl = item.querySelector('.score-text');
-                    const score = scoreEl ? parseFloat(scoreEl.textContent) : 0;
-
-                    const showByGenre  = activeGenres.length === 0 || activeGenres.some(g => movieGenres.includes(g));
-                    const showByVod    = activeVods.length === 0   || activeVods.some(v => movieVods.includes(v));
-                    const showByType   = activeTypes.length === 0  || activeTypes.includes(movieType);
-                    const showByRating = isNaN(score) || score <= maxRating;
-
-                    item.classList.toggle('hidden', !(showByGenre && showByVod && showByType && showByRating));
-                });
-            }
-
-            document.querySelectorAll('.genre-button').forEach(button => {
-                button.addEventListener('click', function() {
-                    this.classList.toggle('active');
-                    applyFilters();
-                });
+            entries.forEach(entry => {
+                const entryGenres = (entry.dataset.genres || '').split(',');
+                const entryVods = (entry.dataset.vods || '').split(',');
+                const score = parseFloat(entry.dataset.score);
+                const visible =
+                    (genres.length === 0 || genres.some(g => entryGenres.includes(g))) &&
+                    (vods.length === 0 || vods.some(v => entryVods.includes(v))) &&
+                    (types.length === 0 || types.includes(entry.dataset.type)) &&
+                    (isNaN(score) || score <= maxRate + 1e-9);
+                entry.hidden = !visible;
+                if (visible) shown++;
             });
 
-            document.querySelectorAll('.vod-button').forEach(button => {
-                button.addEventListener('click', function() {
-                    this.classList.toggle('active');
-                    applyFilters();
-                });
-            });
+            resultCount.textContent = shown.toLocaleString('ja-JP');
+            emptyNote.hidden = shown !== 0;
+            resetButton.hidden = genres.length + vods.length + types.length === 0 && maxRate === MAX_RATE;
+        }
 
-            document.querySelectorAll('.type-button').forEach(button => {
-                button.addEventListener('click', function() {
-                    this.classList.toggle('active');
-                    applyFilters();
-                });
-            });
+        chips.forEach(chip => chip.addEventListener('click', () => {
+            chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+            applyFilters();
+        }));
 
-            document.querySelectorAll('.js-toggle-synopsis').forEach(button => {
-                const synopsisArea = button.closest('.synopsis-area');
-                if (!synopsisArea) return;
-                const full = synopsisArea.querySelector('.js-synopsis-full');
-                full.style.maxHeight = '0px';
+        rateSteps.forEach(btn => btn.addEventListener('click', () => {
+            const next = Math.round((maxRate + parseFloat(btn.dataset.delta)) * 10) / 10;
+            maxRate = Math.min(MAX_RATE, Math.max(0, next));
+            updateRateUI();
+            applyFilters();
+        }));
 
-                button.addEventListener('click', function(event) {
-                    event.preventDefault(); 
-                    event.stopPropagation(); 
-                    const isExpanded = this.getAttribute('data-expanded') === 'true';
-                    
-                    if (!isExpanded) {
-                        full.classList.add('expanded');
-                        // 展開時にscrollHeightを使って高さを取得
-                        full.style.maxHeight = full.scrollHeight + 'px'; 
-                        this.textContent = '一部を隠す▲';
-                        this.setAttribute('data-expanded', 'true');
-                    } else {
-                        // 収縮時に現在のscrollHeightを取得してから高さを0にする
-                        full.style.maxHeight = full.scrollHeight + 'px'; 
-                        setTimeout(() => {
-                            full.style.maxHeight = '0px';
-                            full.classList.remove('expanded'); 
-                        }, 10);
-                        this.textContent = 'あらすじを見る▼';
-                        this.setAttribute('data-expanded', 'false');
-                    }
-                });
+        resetButton.addEventListener('click', () => {
+            chips.forEach(c => c.setAttribute('aria-pressed', 'false'));
+            maxRate = MAX_RATE;
+            updateRateUI();
+            applyFilters();
+        });
+
+        document.querySelectorAll('.synopsis-toggle').forEach(btn => {
+            const panel = document.getElementById(btn.getAttribute('aria-controls'));
+            const label = btn.querySelector('.label');
+            btn.addEventListener('click', () => {
+                const open = btn.getAttribute('aria-expanded') !== 'true';
+                btn.setAttribute('aria-expanded', String(open));
+                panel.classList.toggle('open', open);
+                label.textContent = open ? 'あらすじを閉じる' : 'あらすじを読む';
             });
         });
+
+        updateRateUI();
+        applyFilters();
+    });
     </script>
 </body>
 </html>
