@@ -1,15 +1,20 @@
 name: Scheduled Scraper Update
 
 on:
-  # 毎日午前6時 (UTC) にジョブを実行する (日本時間では午前3時になります。日本時間午前6時なら '21 0 * * *' に変更してください)
+  # 毎日午前6時 (UTC) にジョブを実行する (日本時間では午後3時。日本時間午前6時にするなら '0 21 * * *')
   schedule:
     - cron: '0 6 * * *'
   # 手動実行を可能にする
   workflow_dispatch:
   
 permissions:
-  contents: write 
+  contents: write
   pages: write # Pagesのデプロイを確実にするため追加
+
+# 定期実行と手動実行が重なっても同時には動かさない（後から始まった方は前の完了を待つ）
+concurrency:
+  group: scraper-update
+  cancel-in-progress: false
 
 jobs:
   scrape_and_deploy:
@@ -31,11 +36,18 @@ jobs:
         # スクリプトを実行し、HTMLファイルを生成
         run: python filmarks_scraper.py
 
+      - name: Pull latest changes
+        # スクレイピング中（約40分）に main へ別のプッシュがあると、そのままではプッシュが拒否される。
+        # 生成した index.html を一時退避（autostash）して最新を取り込んでからコミットする。
+        # 退避にはコミット者の情報が必要なので、bot の名前を一時的に指定する
+        run: >-
+          git -c user.name="github-actions[bot]"
+          -c user.email="41898282+github-actions[bot]@users.noreply.github.com"
+          pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           # 生成されたHTMLファイルのみをコミット対象とする
-          files: filmarks_ranking_styled.html
+          file_pattern: index.html
           commit_message: 'Auto update: Daily ranking data'
-          # GitHub Pagesのビルドをトリガーするためにトークンを使用
-          token: ${{ secrets.GITHUB_TOKEN }}
